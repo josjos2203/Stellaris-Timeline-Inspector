@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stellaris Timeline Inspector</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e1e; color: #d4d4d4; margin: 0; padding: 30px; }
+        h1 { color: #569cd6; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; }
+        .container { display: flex; flex-direction: column; gap: 20px; }
+        
+        button, select { background: #3c3c3c; color: #fff; border: 1px solid #555; padding: 8px 12px; font-size: 1.1em; border-radius: 4px; outline: none; cursor: pointer; }
+        button:hover { background: #555; }
+        
+        /* Landing Page */
+        #landing { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 70vh; gap: 20px; }
+        .landing-box { background: #252526; padding: 40px; border-radius: 8px; border: 1px solid #333; text-align: center; width: 450px; }
+        hr { width: 100%; border: 0; border-top: 1px solid #444; margin: 20px 0; }
+
+        /* Dashboard */
+        .scrubber-panel { background: #252526; padding: 20px; border-radius: 6px; border: 1px solid #333; text-align: center; }
+        #timeline-slider { width: 90%; cursor: pointer; margin-top: 10px; }
+        #date-display { font-size: 1.5em; color: #4ec9b0; font-weight: bold; }
+        .dashboard { display: flex; gap: 20px; height: 720px; }
+        .panel { background: #252526; padding: 20px; border-radius: 6px; border: 1px solid #333; flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+        
+        /* Empire Profile CSS */
+        .empire-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 15px; }
+        .empire-header h2 { margin: 0; color: #4ec9b0; font-size: 1.3em; }
+        .stat-bar { display: flex; gap: 20px; margin-bottom: 15px; font-size: 1.05em; align-items: center; flex-wrap: wrap; }
+        .stat-item { display: flex; align-items: center; gap: 6px; }
+        .stat-item strong { color: #9cdcfe; }
+        
+        .traits-box { margin-bottom: 10px; }
+        .chip { display: inline-block; background: #333; padding: 4px 8px; border-radius: 4px; margin: 2px; font-size: 0.85em; border: 1px solid #555; }
+        .origin-chip { border-color: #ce9178; color: #ce9178; }
+        .gov-chip { border-color: #569cd6; color: #9cdcfe; }
+        .agenda-chip { border-color: #c586c0; color: #e0a9db; }
+        
+        .resource-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .res-item { background: #1e1e1e; padding: 8px 10px; border-radius: 4px; border: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-size: 0.92em; }
+        .res-label { display: flex; align-items: center; gap: 6px; }
+        .game-icon { width: 18px; height: 18px; object-fit: contain; vertical-align: middle; }
+        .res-item .val { font-family: monospace; color: #dcdcaa; font-size: 1.05em; }
+        .res-item .net { font-family: monospace; color: #4caf50; font-size: 0.88em; margin-left: 6px; }
+        .net.neg { color: #f44336; }
+        
+        /* Tabs & Filter Bar */
+        .tabs { display: flex; gap: 10px; margin-bottom: 12px; border-bottom: 1px solid #444; padding-bottom: 10px; align-items: center; justify-content: space-between; }
+        .tab-group { display: flex; gap: 10px; }
+        .tab-btn { background: transparent; border: none; color: #888; font-weight: bold; cursor: pointer; padding: 5px 10px; }
+        .tab-btn.active { color: #4ec9b0; border-bottom: 2px solid #4ec9b0; }
+        .filter-group { display: flex; gap: 6px; }
+        .filter-btn { font-size: 0.8em; padding: 4px 8px; background: #2d2d30; border: 1px solid #444; color: #aaa; }
+        .filter-btn.active { background: #0e639c; color: #fff; border-color: #1177bb; }
+        .tab-content { display: none; flex-grow: 1; overflow-y: auto; }
+        .tab-content.active { display: block; }
+        
+        /* Build & Empire Event List */
+        .build-list { list-style: none; padding: 0; margin: 0; }
+        .build-list li { padding: 7px 0; border-bottom: 1px dashed #3a3a3d; font-size: 0.94em; }
+        .date-badge { color: #dcdcaa; font-family: monospace; margin-right: 8px; }
+        .src-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.8em; margin-right: 6px; background: #2d2d30; color: #aaa; border: 1px solid #444; }
+        .src-badge.empire { background: #2a2235; color: #c586c0; border-color: #553b6e; font-weight: bold; }
+        .item-build { color: #9cdcfe; font-weight: bold; }
+        .item-conquest { color: #4caf50; font-style: italic; font-weight: bold; }
+        .item-loss { color: #f44336; font-style: italic; font-weight: bold; }
+        .item-tradition { color: #c586c0; font-weight: bold; }
+        .item-perk { color: #ffd700; font-weight: bold; }
+        .item-agenda { color: #4ec9b0; font-weight: bold; }
+        .item-gov { color: #ce9178; font-weight: bold; }
+        
+        /* Fleets & Ship Templates */
+        .fleet-box { border: 1px solid #444; border-radius: 6px; margin-bottom: 12px; background: #1e1e1e; overflow: hidden; }
+        .fleet-header { padding: 10px 14px; background: #2d2d30; font-weight: bold; display: flex; justify-content: space-between; cursor: pointer; align-items: center; }
+        .fleet-header:hover { background: #36363a; }
+        .fleet-meta { display: flex; align-items: center; gap: 14px; font-size: 0.9em; }
+        .fleet-sys { color: #4ec9b0; font-weight: normal; }
+        .fleet-cond-strip { padding: 6px 14px; background: #222225; border-bottom: 1px solid #333; font-size: 0.85em; display: flex; gap: 16px; color: #bbb; }
+        .fleet-body { padding: 12px; display: none; }
+        .fleet-body.open { display: block; }
+        
+        .ship-group { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #333; }
+        .ship-group:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .ship-group-title { font-size: 1em; margin-bottom: 8px; }
+        .ship-group-title strong { color: #ce9178; }
+        
+        .template-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+        .sec-card { background: #252526; border: 1px solid #3e3e42; border-radius: 4px; padding: 8px 10px; min-width: 135px; flex: 1; }
+        .sec-title { font-size: 0.8em; color: #dcdcaa; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #3e3e42; padding-bottom: 4px; margin-bottom: 6px; font-weight: bold; }
+        .slot-item { font-size: 0.83em; margin: 3px 0; display: flex; justify-content: space-between; gap: 8px; }
+        .slot-badge { display: inline-block; background: #0e639c; color: #fff; font-weight: bold; font-size: 0.75em; padding: 1px 5px; border-radius: 3px; margin-right: 4px; font-family: monospace; }
+        .slot-badge.P { background: #8a3b3b; }
+        .slot-badge.H { background: #6b6b2b; }
+        .slot-badge.G { background: #8a5a2b; }
+        .slot-badge.A { background: #2b6b5a; }
+        .core-line { font-size: 0.8em; color: #999; margin-top: 6px; }
+        .core-chip { background: #2a2a2d; border: 1px solid #444; padding: 2px 6px; border-radius: 3px; margin-right: 4px; display: inline-block; margin-top: 3px; color: #bbb; }
+    </style>
+</head>
+<body>
+
+    <h1>Stellaris Timeline Inspector <button id="btn-back" style="display:none; float:right; font-size: 0.7em;" onclick="location.reload()">Back to Menu</button></h1>
+    
+    <!-- LANDING MENU -->
+    <div id="landing">
+        <div class="landing-box">
+            <h2 style="margin-top:0; color:#4ec9b0;">Load Timeline</h2>
+            <select id="file-select" style="width:100%; margin-bottom: 15px;">
+                <option value="">No existing timelines found...</option>
+            </select>
+            <button onclick="loadSelectedTimeline()" style="width:100%;">View Timeline</button>
+            <hr>
+            <h2 style="margin-top:0; color:#9cdcfe;">New Extraction</h2>
+            <p style="font-size: 0.9em; color: #aaa; margin-top: 0;">To analyze a new save folder, leave this window open and run <strong>"Extract New Save Folder.cmd"</strong> from your BuildOrder folder.</p>
+        </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard-view" class="container" style="display:none;">
+        <div class="scrubber-panel">
+            <div id="date-display">Loading Timeline...</div>
+            <input type="range" id="timeline-slider" min="0" max="0" value="0">
+        </div>
+        
+        <div class="dashboard">
+            <!-- EMPIRE PROFILE -->
+            <div class="panel" style="flex: 1.25;">
+                <div class="empire-header">
+                    <select id="player-select" style="width: 240px; margin: 0;"></select>
+                    <h2 id="emp-name">Empire Name</h2>
+                </div>
+                
+                <div class="stat-bar">
+                    <div class="stat-item"><img class="game-icon" data-dds="/gfx/interface/icons/planet.dds"> Planets: <strong id="emp-planets">0</strong></div>
+                    <div class="stat-item"><img class="game-icon" data-dds="/gfx/interface/planetview/trade_value.dds"> Eco Power: <strong id="emp-eco">0</strong></div>
+                    <div class="stat-item"><img class="game-icon" data-dds="/gfx/interface/icons/research_icon.dds"> Tech Power: <strong id="emp-tech">0</strong></div>
+                    <div class="stat-item"><img class="game-icon" data-dds="/gfx/interface/system/offensive_value.dds"> Fleet Power: <strong id="emp-fleet">0</strong></div>
+                </div>
+                
+                <div class="traits-box" id="emp-civics"></div>
+                <div class="traits-box" id="emp-traits"></div>
+                
+                <h3 style="margin: 6px 0 8px 0; color: #888; font-size: 0.95em;">Resource Stockpile / Monthly Net</h3>
+                <div class="resource-grid" id="emp-resources"></div>
+            </div>
+            
+            <!-- TABS (TIMELINE FEED & FLEETS) -->
+            <div class="panel" style="flex: 1.25;">
+                <div class="tabs">
+                    <div class="tab-group">
+                        <button class="tab-btn active" onclick="switchTab('tab-builds', this)">Timeline Feed</button>
+                        <button class="tab-btn" onclick="switchTab('tab-fleets', this)">Military Fleets</button>
+                    </div>
+                    <div class="filter-group" id="feed-filters">
+                        <button class="filter-btn active" onclick="setFeedFilter('ALL', this)">All</button>
+                        <button class="filter-btn" onclick="setFeedFilter('EMPIRE', this)">Empire Events</button>
+                        <button class="filter-btn" onclick="setFeedFilter('PLANET', this)">Planet Builds</button>
+                    </div>
+                </div>
+                
+                <div id="tab-builds" class="tab-content active">
+                    <ul class="build-list" id="build-feed"></ul>
+                </div>
+                
+                <div id="tab-fleets" class="tab-content">
+                    <div id="fleet-feed"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let timelineData = null;
+        let globalDates = [];
+        let feedFilter = 'ALL';
+        const ddsCache = new Map();
+
+        function decodeDds(buffer) {
+            const view = new DataView(buffer);
+            if (view.getUint32(0, true) !== 0x20534444) throw new Error('Invalid DDS');
+            const height = view.getUint32(12, true);
+            const width = view.getUint32(16, true);
+            const pfFlags = view.getUint32(80, true);
+            const fourCC = view.getUint32(84, true);
+            const bitCount = view.getUint32(88, true);
+            const rMask = view.getUint32(92, true);
+            const gMask = view.getUint32(96, true);
+            const bMask = view.getUint32(100, true);
+            const aMask = view.getUint32(104, true);
+
+            const out = new Uint8ClampedArray(width * height * 4);
+            const dataOffset = 128;
+
+            const shiftFor = mask => mask ? Math.clz32(mask & -mask) ^ 31 : 0;
+            const scaleFor = mask => {
+                if (!mask) return 0;
+                const bits = 32 - Math.clz32(mask >>> shiftFor(mask));
+                return 255 / ((1 << bits) - 1);
+            };
+
+            if (!(pfFlags & 0x4)) {
+                const bytesPerPixel = bitCount / 8;
+                const rShift = shiftFor(rMask), gShift = shiftFor(gMask), bShift = shiftFor(bMask), aShift = shiftFor(aMask);
+                const rScale = scaleFor(rMask), gScale = scaleFor(gMask), bScale = scaleFor(bMask), aScale = scaleFor(aMask);
+                let src = dataOffset;
+                for (let i = 0; i < width * height; i++) {
+                    let pixel = 0;
+                    for (let b = 0; b < bytesPerPixel; b++) pixel |= view.getUint8(src + b) << (b * 8);
+                    src += bytesPerPixel;
+                    out[i * 4]     = ((pixel & rMask) >>> rShift) * rScale;
+                    out[i * 4 + 1] = ((pixel & gMask) >>> gShift) * gScale;
+                    out[i * 4 + 2] = ((pixel & bMask) >>> bShift) * bScale;
+                    out[i * 4 + 3] = aMask ? (((pixel & aMask) >>> aShift) * aScale) : 255;
+                }
+                return { width, height, data: out };
+            }
+
+            const isDxt5 = fourCC === 0x35545844;
+            let src = dataOffset;
+            const blocksWide = Math.max(1, Math.ceil(width / 4));
+            const blocksHigh = Math.max(1, Math.ceil(height / 4));
+
+            const unpack565 = c => [
+                Math.round(((c >> 11) & 31) * (255 / 31)),
+                Math.round(((c >> 5) & 63) * (255 / 63)),
+                Math.round((c & 31) * (255 / 31))
+            ];
+
+            for (let by = 0; by < blocksHigh; by++) {
+                for (let bx = 0; bx < blocksWide; bx++) {
+                    const alphas = new Uint8Array(16);
+                    if (isDxt5) {
+                        const a0 = view.getUint8(src), a1 = view.getUint8(src + 1);
+                        const aLut = new Uint8Array(8);
+                        aLut[0] = a0; aLut[1] = a1;
+                        if (a0 > a1) {
+                            for (let i = 1; i <= 6; i++) aLut[i + 1] = Math.round(((7 - i) * a0 + i * a1) / 7);
+                        } else {
+                            for (let i = 1; i <= 4; i++) aLut[i + 1] = Math.round(((5 - i) * a0 + i * a1) / 5);
+                            aLut[6] = 0; aLut[7] = 255;
+                        }
+                        let aBits = 0n;
+                        for (let i = 0; i < 6; i++) aBits |= BigInt(view.getUint8(src + 2 + i)) << BigInt(i * 8);
+                        for (let i = 0; i < 16; i++) alphas[i] = aLut[Number((aBits >> BigInt(i * 3)) & 7n)];
+                        src += 8;
+                    } else {
+                        alphas.fill(255);
+                    }
+
+                    const c0 = view.getUint16(src, true), c1 = view.getUint16(src + 2, true);
+                    const bits = view.getUint32(src + 4, true);
+                    src += 8;
+
+                    const [r0, g0, b0] = unpack565(c0);
+                    const [r1, g1, b1] = unpack565(c1);
+                    const colors = [
+                        [r0, g0, b0, 255],
+                        [r1, g1, b1, 255],
+                        c0 > c1 || isDxt5
+                            ? [Math.round((2 * r0 + r1) / 3), Math.round((2 * g0 + g1) / 3), Math.round((2 * b0 + b1) / 3), 255]
+                            : [Math.round((r0 + r1) / 2), Math.round((g0 + g1) / 2), Math.round((b0 + b1) / 2), 255],
+                        c0 > c1 || isDxt5
+                            ? [Math.round((r0 + 2 * r1) / 3), Math.round((g0 + 2 * g1) / 3), Math.round((b0 + 2 * b1) / 3), 255]
+                            : [0, 0, 0, 0]
+                    ];
+
+                    for (let py = 0; py < 4; py++) {
+                        for (let px = 0; px < 4; px++) {
+                            const x = bx * 4 + px, y = by * 4 + py;
+                            if (x >= width || y >= height) continue;
+                            const idx = py * 4 + px;
+                            const code = (bits >>> (idx * 2)) & 3;
+                            const dst = (y * width + x) * 4;
+                            out[dst]     = colors[code][0];
+                            out[dst + 1] = colors[code][1];
+                            out[dst + 2] = colors[code][2];
+                            out[dst + 3] = isDxt5 ? alphas[idx] : colors[code][3];
+                        }
+                    }
+                }
+            }
+            return { width, height, data: out };
+        }
+
+        async function loadDdsUrl(path) {
+            if (ddsCache.has(path)) return ddsCache.get(path);
+            const promise = (async () => {
+                const res = await fetch(path);
+                if (!res.ok) throw new Error(`Missing texture: ${path}`);
+                const decoded = decodeDds(await res.arrayBuffer());
+                const canvas = document.createElement('canvas');
+                canvas.width = decoded.width;
+                canvas.height = decoded.height;
+                canvas.getContext('2d').putImageData(new ImageData(decoded.data, decoded.width, decoded.height), 0, 0);
+                return canvas.toDataURL();
+            })();
+            ddsCache.set(path, promise);
+            return promise;
+        }
+
+        function hydrateDdsImages(root = document) {
+            root.querySelectorAll('img[data-dds]').forEach(img => {
+                const path = img.getAttribute('data-dds');
+                loadDdsUrl(path).then(url => { img.src = url; }).catch(() => {});
+            });
+        }
+
+        function fetchTimelines() {
+            fetch('/api/list')
+                .then(res => res.json())
+                .then(files => {
+                    const select = document.getElementById('file-select');
+                    if (files.length > 0) {
+                        select.innerHTML = files.map(f => `<option value="${f}">${f}</option>`).join('');
+                    }
+                });
+        }
+        
+        fetchTimelines();
+
+        function loadSelectedTimeline() {
+            const filename = document.getElementById('file-select').value;
+            if (!filename) return;
+
+            document.getElementById('landing').style.display = 'none';
+            document.getElementById('dashboard-view').style.display = 'flex';
+            document.getElementById('btn-back').style.display = 'block';
+
+            fetch(`/output/${encodeURIComponent(filename)}`)
+                .then(res => {
+                    if (!res.ok) throw new Error("File not found on server.");
+                    return res.json();
+                })
+                .then(data => {
+                    timelineData = data;
+                    document.title = `${data.campaign_name} - Timeline Inspector`;
+                    initializeDashboard();
+                    hydrateDdsImages();
+                })
+                .catch(err => { alert("Error loading timeline: " + err.message); location.reload(); });
+        }
+
+        function switchTab(tabId, btn) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            btn.classList.add('active');
+            document.getElementById('feed-filters').style.display = (tabId === 'tab-builds') ? 'flex' : 'none';
+        }
+
+        function setFeedFilter(mode, btn) {
+            feedFilter = mode;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            updateView();
+        }
+
+        function toggleFleet(header) {
+            const body = header.parentElement.querySelector('.fleet-body');
+            if (body) body.classList.toggle('open');
+        }
+
+        function initializeDashboard() {
+            const playerSelect = document.getElementById('player-select');
+            const slider = document.getElementById('timeline-slider');
+            playerSelect.innerHTML = "";
+            
+            const dateSet = new Set();
+            for (const pid in timelineData.players) {
+                const p = timelineData.players[pid];
+                p.stats_history.forEach(stat => dateSet.add(stat.date));
+                playerSelect.innerHTML += `<option value="${pid}">${p.name}</option>`;
+            }
+            
+            globalDates = Array.from(dateSet).sort();
+            slider.max = globalDates.length - 1;
+            slider.value = globalDates.length - 1;
+
+            slider.addEventListener('input', updateView);
+            playerSelect.addEventListener('change', updateView);
+
+            updateView();
+        }
+
+        // All 18 resources in the exact requested order
+        const resConfig = [
+            { key: "energy", label: "Energy", icon: "/gfx/interface/icons/resources/energy.dds" },
+            { key: "minerals", label: "Minerals", icon: "/gfx/interface/icons/resources/minerals.dds" },
+            { key: "food", label: "Food", icon: "/gfx/interface/icons/resources/food.dds" },
+            { key: "trade", label: "Trade", icon: "/gfx/interface/planetview/trade_value.dds" },
+            { key: "alloys", label: "Alloys", icon: "/gfx/interface/icons/resources/alloys.dds" },
+            { key: "consumer_goods", label: "Cons. Goods", icon: "/gfx/interface/icons/resources/consumer_goods.dds" },
+            { key: "physics_research", label: "Physics", icon: "/gfx/interface/icons/resources/physics_research.dds" },
+            { key: "society_research", label: "Society", icon: "/gfx/interface/icons/resources/society_research.dds" },
+            { key: "engineering_research", label: "Engineering", icon: "/gfx/interface/icons/resources/engineering_research.dds" },
+            { key: "unity", label: "Unity", icon: "/gfx/interface/icons/resources/unity.dds" },
+            { key: "influence", label: "Influence", icon: "/gfx/interface/icons/resources/influence.dds" },
+            { key: "minor_artifacts", label: "Minor Artifacts", icon: "/gfx/interface/icons/resources/minor_artifacts.dds" },
+            { key: "volatile_motes", label: "Volatile Motes", icon: "/gfx/interface/icons/resources/volatile_motes.dds" },
+            { key: "exotic_gases", label: "Exotic Gases", icon: "/gfx/interface/icons/resources/exotic_gases.dds" },
+            { key: "rare_crystals", label: "Rare Crystals", icon: "/gfx/interface/icons/resources/rare_crystals.dds" },
+            { key: "sr_zro", label: "Zro", icon: "/gfx/interface/icons/resources/sr_zro.dds" },
+            { key: "nanites", label: "Nanites", icon: "/gfx/interface/icons/resources/nanites.dds" },
+            { key: "sr_living_metal", label: "Living Metal", icon: "/gfx/interface/icons/resources/sr_living_metal.dds" }
+        ];
+
+        function formatNum(num) { return Number(num).toLocaleString('en-US', {maximumFractionDigits: 1}); }
+        function formatNet(num) { const n = Number(num); return (n > 0 ? "+" : "") + n.toLocaleString('en-US', {maximumFractionDigits: 1}); }
+
+        function renderTemplateGroup(g) {
+            if (!g.sections) {
+                const compHtml = (g.components || []).map(c => `<span class="core-chip">${c}</span>`).join('');
+                return `<div class="ship-group">
+                    <div class="ship-group-title"><strong>${g.count}x</strong> ${g.size} <span style="color:#888;">(${g.design})</span></div>
+                    <div>${compHtml}</div>
+                </div>`;
+            }
+
+            let cardsHtml = g.sections.map(sec => {
+                const wHtml = sec.weapons.length > 0
+                    ? sec.weapons.map(w => `<div class="slot-item"><span><span class="slot-badge ${w.size}">${w.size}</span>${w.name}</span><strong>×${w.count}</strong></div>`).join('')
+                    : `<div style="color:#666; font-size:0.8em;">No weapons</div>`;
+                return `<div class="sec-card">
+                    <div class="sec-title">${sec.name}</div>
+                    ${wHtml}
+                </div>`;
+            }).join('');
+
+            const renderDefCard = (title, items, badge) => {
+                if (!items || items.length === 0) return '';
+                const rows = items.map(it => `<div class="slot-item"><span>${badge ? `<span class="slot-badge ${badge}">${badge}</span>` : ''}${it.name}</span><strong>×${it.count}</strong></div>`).join('');
+                return `<div class="sec-card">
+                    <div class="sec-title">${title}</div>
+                    ${rows}
+                </div>`;
+            };
+
+            cardsHtml += renderDefCard("Auxiliaries", g.auxiliaries, "A");
+            cardsHtml += renderDefCard("Armor", g.armor, "");
+            cardsHtml += renderDefCard("Shields", g.shields, "");
+
+            const coreHtml = (g.required && g.required.length > 0)
+                ? `<div class="core-line">Core Systems: ${g.required.map(r => `<span class="core-chip">${r}</span>`).join('')}</div>`
+                : '';
+
+            return `<div class="ship-group">
+                <div class="ship-group-title"><strong>${g.count}x</strong> ${g.size} &middot; <span style="color:#9cdcfe;">${g.design}</span> <span style="color:#777; font-size:0.85em;">(components per ship)</span></div>
+                <div class="template-grid">${cardsHtml}</div>
+                ${coreHtml}
+            </div>`;
+        }
+
+        function updateView() {
+            const slider = document.getElementById('timeline-slider');
+            const currentDate = globalDates[parseInt(slider.value)];
+            const player = timelineData.players[document.getElementById('player-select').value];
+            document.getElementById('date-display').textContent = `Date: ${currentDate}`;
+            document.getElementById('emp-name').textContent = player.empire_name ? `${player.name} (${player.empire_name})` : player.name;
+
+            let currentStats = player.stats_history.filter(s => s.date <= currentDate).pop();
+            if (!currentStats) return;
+
+            document.getElementById('emp-planets').textContent = currentStats.owned_planets;
+            document.getElementById('emp-eco').textContent = formatNum(currentStats.economy_power);
+            document.getElementById('emp-tech').textContent = formatNum(currentStats.tech_power);
+            document.getElementById('emp-fleet').textContent = formatNum(currentStats.military_power);
+
+            // Origin, Government, Civics & Active Council Agenda chips
+            let civicsHtml = `<span class="chip origin-chip">${currentStats.origin}</span>`;
+            if (currentStats.government) {
+                civicsHtml += `<span class="chip gov-chip">${currentStats.government}</span>`;
+            }
+            currentStats.civics.forEach(c => civicsHtml += `<span class="chip">${c}</span>`);
+            if (currentStats.active_agenda && currentStats.active_agenda !== "None") {
+                civicsHtml += `<span class="chip agenda-chip">Agenda: ${currentStats.active_agenda} (${formatNum(currentStats.agenda_progress || 0)})</span>`;
+            }
+            document.getElementById('emp-civics').innerHTML = civicsHtml;
+
+            let traitsHtml = ``;
+            currentStats.traits.forEach(t => traitsHtml += `<span class="chip">${t}</span>`);
+            document.getElementById('emp-traits').innerHTML = traitsHtml;
+
+            // Render all 18 resources
+            let resHtml = "";
+            for (const { key, label, icon } of resConfig) {
+                const data = currentStats.resources[key] || {stockpile: 0, balance: 0};
+                const netClass = data.balance < 0 ? "neg" : "";
+                resHtml += `<div class="res-item">
+                    <span class="res-label"><img class="game-icon" data-dds="${icon}" alt="${label}"> ${label}</span>
+                    <div><span class="val">${formatNum(data.stockpile)}</span><span class="net ${netClass}">${formatNet(data.balance)}</span></div>
+                </div>`;
+            }
+            const resContainer = document.getElementById('emp-resources');
+            resContainer.innerHTML = resHtml;
+            hydrateDdsImages(resContainer);
+
+            // Update Fleets Tab
+            const fleetFeed = document.getElementById('fleet-feed');
+            fleetFeed.innerHTML = "";
+            if (currentStats.fleets && currentStats.fleets.length > 0) {
+                currentStats.fleets.forEach(f => {
+                    let templates = f.templates;
+                    if (!templates && f.ships) {
+                        const groups = {};
+                        f.ships.forEach(s => {
+                            const key = `${s.size}::${s.name}`;
+                            if (!groups[key]) groups[key] = { size: s.size, design: s.name, components: s.components || [], count: 0 };
+                            groups[key].count++;
+                        });
+                        templates = Object.values(groups);
+                    }
+
+                    const totalShips = f.ship_count !== undefined ? f.ship_count : (f.ships ? f.ships.length : 0);
+                    const sysText = f.system ? `<span class="fleet-sys">📍 ${f.system}</span>` : '';
+                    const cond = f.condition || { hull_pct: 100, armor_pct: 100, shield_pct: 100 };
+                    const shipsHtml = (templates || []).map(renderTemplateGroup).join('');
+
+                    fleetFeed.innerHTML += `
+                        <div class="fleet-box">
+                            <div class="fleet-header" onclick="toggleFleet(this)">
+                                <span>${f.name} <span style="color:#888; font-weight:normal; font-size:0.9em;">(${totalShips} ships)</span></span>
+                                <div class="fleet-meta">
+                                    ${sysText}
+                                    <span style="color:#f44336; display:flex; align-items:center; gap:5px;">
+                                        <img class="game-icon" data-dds="/gfx/interface/system/offensive_value.dds"> ${formatNum(f.power)}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="fleet-cond-strip">
+                                <span><img class="game-icon" data-dds="/gfx/interface/icons/ship_stats/hit_points.dds"> Hull: <strong>${cond.hull_pct}%</strong></span>
+                                <span><img class="game-icon" data-dds="/gfx/interface/icons/ship_stats/armor.dds"> Armor: <strong>${cond.armor_pct}%</strong></span>
+                                <span><img class="game-icon" data-dds="/gfx/interface/icons/ship_stats/shield.dds"> Shields: <strong>${cond.shield_pct}%</strong></span>
+                            </div>
+                            <div class="fleet-body open">${shipsHtml || "No ships available."}</div>
+                        </div>
+                    `;
+                });
+                hydrateDdsImages(fleetFeed);
+            } else {
+                fleetFeed.innerHTML = "<p style='color:#888;'>No military fleets found.</p>";
+            }
+
+            // Update Unified Timeline Feed (Planetary Builds + Empire Events)
+            const buildFeed = document.getElementById('build-feed');
+            buildFeed.innerHTML = "";
+            let timelineEvents = [];
+            
+            if (feedFilter === 'ALL' || feedFilter === 'PLANET') {
+                for (const planetId in player.planets) {
+                    player.planets[planetId].builds.forEach(b => {
+                        if (b.date <= currentDate) {
+                            timelineEvents.push({
+                                ...b,
+                                category: 'PLANET',
+                                sourceLabel: player.planets[planetId].name
+                            });
+                        }
+                    });
+                }
+            }
+
+            if ((feedFilter === 'ALL' || feedFilter === 'EMPIRE') && player.empire_events) {
+                player.empire_events.forEach(e => {
+                    if (e.date <= currentDate) {
+                        timelineEvents.push({
+                            ...e,
+                            category: 'EMPIRE',
+                            sourceLabel: 'Empire'
+                        });
+                    }
+                });
+            }
+
+            timelineEvents.sort((a, b) => a.date.localeCompare(b.date)).forEach(ev => {
+                let textClass = 'item-build';
+                let actionText = `Built: ${ev.item}`;
+                let badgeClass = ev.category === 'EMPIRE' ? 'src-badge empire' : 'src-badge';
+
+                if (ev.type === "COLONIZED") { actionText = "Colonized / Settled"; textClass = 'item-conquest'; }
+                else if (ev.type === "TAKEN") { actionText = `Conquered from ${ev.item}`; textClass = 'item-conquest'; }
+                else if (ev.type === "LOST") { actionText = `Lost to ${ev.item}`; textClass = 'item-loss'; }
+                else if (ev.type === "TRADITION") { actionText = `Tradition: ${ev.item}`; textClass = 'item-tradition'; }
+                else if (ev.type === "ASCENSION_PERK") { actionText = `Ascension Perk: ${ev.item}`; textClass = 'item-perk'; }
+                else if (ev.type === "AGENDA_SELECTED") { actionText = `Agenda Selected: ${ev.item}`; textClass = 'item-agenda'; }
+                else if (ev.type === "AGENDA_LAUNCHED") { actionText = `Agenda Launched: ${ev.item}`; textClass = 'item-agenda'; }
+                else if (ev.type === "CIVICS_CHANGED") { actionText = `Civics Reformed: ${ev.item}`; textClass = 'item-gov'; }
+                else if (ev.type === "GOV_CHANGED") { actionText = `Government Reformed: ${ev.item}`; textClass = 'item-gov'; }
+
+                buildFeed.innerHTML += `<li><span class="date-badge">[${ev.date}]</span> <span class="${badgeClass}">${ev.sourceLabel}</span> &rarr; <span class="${textClass}">${actionText}</span></li>`;
+            });
+            buildFeed.scrollTop = buildFeed.scrollHeight;
+        }
+    </script>
+</body>
+</html>
