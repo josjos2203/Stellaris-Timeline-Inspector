@@ -2,7 +2,7 @@ import os
 import sys
 import json
 import webbrowser
-from http.server import SimpleHTTPRequestHandler, HTTPServer
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import urllib.parse
 from setup_config import get_stellaris_dir
 
@@ -16,6 +16,9 @@ if not STELLARIS_DIR:
     sys.exit(1)
 
 class StellarisHandler(SimpleHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+
     def end_headers(self):
         self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         self.send_header('Pragma', 'no-cache')
@@ -23,15 +26,31 @@ class StellarisHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def do_GET(self):
-        if self.path.startswith('/api/list'):
+        parsed = urllib.parse.urlparse(self.path)
+
+        if parsed.path == '/api/list':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             
             output_dir = os.path.join(SCRIPT_DIR, 'output')
             os.makedirs(output_dir, exist_ok=True)
-            files = [f for f in os.listdir(output_dir) if f.endswith('.json')]
+            files = sorted([f for f in os.listdir(output_dir) if f.endswith('.json')])
             self.wfile.write(json.dumps(files).encode())
+            return
+
+        if parsed.path == '/api/meta':
+            qs = urllib.parse.parse_qs(parsed.query)
+            filename = qs.get('file', [''])[0]
+            target_path = os.path.join(SCRIPT_DIR, 'output', os.path.basename(filename))
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            if filename and os.path.exists(target_path):
+                stat = os.stat(target_path)
+                self.wfile.write(json.dumps({"mtime": stat.st_mtime, "size": stat.st_size}).encode())
+            else:
+                self.wfile.write(json.dumps({"mtime": 0, "size": 0}).encode())
             return
             
         super().do_GET()
@@ -50,10 +69,10 @@ class StellarisHandler(SimpleHTTPRequestHandler):
 def run_server():
     os.chdir(SCRIPT_DIR)
     server_address = ('127.0.0.1', PORT)
-    httpd = HTTPServer(server_address, StellarisHandler)
+    httpd = ThreadingHTTPServer(server_address, StellarisHandler)
     
     print(f"Using Stellaris Assets from: {STELLARIS_DIR}")
-    print(f"Stellaris Timeline Server running on http://127.0.0.1:{PORT}")
+    print(f"Stellaris Timeline Server (Multi-Threaded Live Mode) running on http://127.0.0.1:{PORT}")
     print("Close this window to shut down the server.")
     
     webbrowser.open(f'http://127.0.0.1:{PORT}/index.html')

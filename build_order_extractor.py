@@ -12,6 +12,7 @@ from setup_config import get_stellaris_dir
 
 # Pre-compiled global regexes for worker processes
 TOP_LEVEL_PATTERN = re.compile(r'(?:^|\n)\s*(\d+)\s*=\s*\{')
+NAMED_BLOCK_PATTERN = re.compile(r'(?:^|\n)\s*([A-Za-z0-9_\.\-]+)\s*=\s*\{')
 ITEM_PATTERN = re.compile(
     r'(\d+)=\s*\{[^{}]*queue=(\d+)\s*paying_country=(\d+)(?:(?!queue=)[\s\S]){1,300}?(?:building|district|zone)="([^"]+)"\s*planet=(\d+)'
 )
@@ -30,111 +31,7 @@ NON_MILITARY_SIZES = {
 # Worker-level globals (initialized once per CPU core)
 WORKER_LOC_DICT = {}
 WORKER_PLAYER_PIDS = set()
-WORKER_SYSTEM_NAMES = {}
-
-
-def load_stellaris_localization(game_folder):
-    loc_dict = {}
-    target_dirs = [
-        os.path.join(game_folder, "localisation", "english"),
-        os.path.join(game_folder, "localisation", "english", "name_lists"),
-        os.path.join(game_folder, "localisation", "english", "random_names")
-    ]
-    loc_pattern = re.compile(r'^\s*([a-zA-Z0-9_\.\-]+)\s*:\d*\s*\"([^\"]*)\"', re.MULTILINE)
-
-    print("[1/4] Loading Stellaris Localization files...")
-    for d in target_dirs:
-        if not os.path.exists(d):
-            continue
-        for root, dirs, files in os.walk(d):
-            for file in files:
-                if file.endswith('.yml'):
-                    try:
-                        with open(os.path.join(root, file), 'r', encoding='utf-8-sig', errors='ignore') as f:
-                            for match in loc_pattern.finditer(f.read()):
-                                loc_dict[match.group(1)] = match.group(2)
-                    except Exception:
-                        pass
-    return loc_dict
-
-
-def resolve_loc_references(text, loc_dict, depth=0):
-    """Recursively replaces $KEY$ localization aliases with their actual English strings."""
-    if not text or '$' not in text or depth > 5:
-        return text
-
-    def repl(match):
-        ref_key = match.group(1)
-        if ref_key in loc_dict:
-            return resolve_loc_references(loc_dict[ref_key], loc_dict, depth + 1)
-        for k in (ref_key.upper(), ref_key.lower()):
-            if k in loc_dict:
-                return resolve_loc_references(loc_dict[k], loc_dict, depth + 1)
-        return ref_key.replace('_', ' ').title()
-
-    return re.sub(r'\$([A-Za-z0-9_\.\-]+)\$', repl, text)
-
-
-def clean_loc(key, loc_dict):
-    if not key:
-        return "None"
-    raw = None
-    if key in loc_dict:
-        raw = loc_dict[key]
-    elif f"{key}_name" in loc_dict:
-        raw = loc_dict[f"{key}_name"]
-    else:
-        stripped = re.sub(
-            r'^(?:SMALL|MEDIUM|LARGE|CORVETTE|DESTROYER|CRUISER|BATTLESHIP|TITAN|COLOSSUS|JUGGERNAUT|PLATFORM|STARBASE)_',
-            '', key
-        )
-        if stripped in loc_dict:
-            raw = loc_dict[stripped]
-
-    if raw:
-        resolved = resolve_loc_references(raw, loc_dict)
-        return re.sub(r'§[A-Za-z!]', '', resolved).strip()
-
-    cleaned = key
-    for prefix in ('trait_', 'civic_', 'origin_', 'building_', 'district_', 'agenda_', 'tr_', 'tradition_', 'ap_', 'gov_', 'auth_'):
-        if cleaned.startswith(prefix):
-            cleaned = cleaned[len(prefix):]
-            break
-    return cleaned.replace('_', ' ').title()
-
-
-def format_tradition_name(t_key, loc_dict):
-    """Formats tradition unlocks clearly, e.g. 'Adopted Supremacy', 'Finished Supremacy', or specific node name."""
-    if t_key.endswith('_adopt'):
-        base = t_key[:-6]
-        tree_key = base.replace('tr_', 'tradition_', 1)
-        tree_name = clean_loc(tree_key, loc_dict) if tree_key in loc_dict else clean_loc(base, loc_dict)
-        return f"Adopted {tree_name} Tree"
-    if t_key.endswith('_finish'):
-        base = t_key[:-7]
-        tree_key = base.replace('tr_', 'tradition_', 1)
-        tree_name = clean_loc(tree_key, loc_dict) if tree_key in loc_dict else clean_loc(base, loc_dict)
-        return f"Finished {tree_name} Tree"
-    return clean_loc(t_key, loc_dict)
-
-
-def extract_gamestate_head(file_or_dir_path, num_bytes=2000):
-    if zipfile.is_zipfile(file_or_dir_path):
-        with zipfile.ZipFile(file_or_dir_path, 'r') as z:
-            if 'gamestate' in z.namelist():
-                with z.open('gamestate') as f:
-                    return f.read(num_bytes).decode('utf-8', errors='ignore')
-    with open(file_or_dir_path, 'r', encoding='utf-8', errors='ignore') as f:
-        return f.read(num_bytes)
-
-
-def extract_gamestate_content(file_or_dir_path):
-    if zipfile.is_zipfile(file_or_dir_path):
-        with zipfile.ZipFile(file_or_dir_path, 'r') as z:
-            if 'gamestate' in z.namelist():
-                return z.read('gamestate').decode('utf-8', errors='ignore')
-    with open(file_or_dir_path, 'r', encoding='utf-8', errors='ignore') as f:
-        return f.read()
+WORKER_COMP_ICONS = {}
 
 
 def extract_block(text, start_index):
@@ -176,6 +73,312 @@ def get_top_level_blocks(container_text):
         else:
             pos = m.end()
     return blocks
+
+
+def get_named_blocks(container_text):
+    blocks = []
+    pos = 0
+    search = NAMED_BLOCK_PATTERN.search
+    while True:
+        m = search(container_text, pos)
+        if not m:
+            break
+        key = m.group(1)
+        start_idx = m.end() - 1
+        block_content = extract_block(container_text, start_idx)
+        if block_content:
+            blocks.append((key, block_content))
+            pos = start_idx + len(block_content)
+        else:
+            pos = m.end()
+    return blocks
+
+
+def load_stellaris_localization(game_folder):
+    loc_dict = {}
+    target_dirs = [
+        os.path.join(game_folder, "localisation", "english"),
+        os.path.join(game_folder, "localisation", "english", "name_lists"),
+        os.path.join(game_folder, "localisation", "english", "random_names")
+    ]
+    loc_pattern = re.compile(r'^\s*([a-zA-Z0-9_\.\-]+)\s*:\d*\s*\"([^\"]*)\"', re.MULTILINE)
+
+    print("[1/4] Loading Stellaris Localization & Game Icon Catalogs...")
+    for d in target_dirs:
+        if not os.path.exists(d):
+            continue
+        for root, dirs, files in os.walk(d):
+            for file in files:
+                if file.endswith('.yml'):
+                    try:
+                        with open(os.path.join(root, file), 'r', encoding='utf-8-sig', errors='ignore') as f:
+                            for match in loc_pattern.finditer(f.read()):
+                                loc_dict[match.group(1)] = match.group(2)
+                    except Exception:
+                        pass
+    return loc_dict
+
+
+def build_game_catalog(game_folder):
+    """
+    Indexes .dds icons (prioritizing core gameplay folders over achievements)
+    and parses interface/*.gfx, component_templates, traits, civics, origins, ethics, and technologies.
+    """
+    dds_by_stem = {}
+    icons_root = os.path.join(game_folder, "gfx", "interface", "icons")
+
+    # Index high-priority gameplay icon folders first so achievements never shadow them
+    priority_subfolders = [
+        "technologies", "ship_parts", "traits", "governments",
+        "origins", "ethics", "resources", "agenda_icons", "traditions", "ascension_perks"
+    ]
+    for sub in priority_subfolders:
+        sub_path = os.path.join(icons_root, sub)
+        if os.path.exists(sub_path):
+            for root, _, files in os.walk(sub_path):
+                for f in files:
+                    if f.lower().endswith(".dds"):
+                        stem = os.path.splitext(f)[0].lower()
+                        rel = "/" + os.path.relpath(os.path.join(root, f), game_folder).replace("\\", "/")
+                        if stem not in dds_by_stem:
+                            dds_by_stem[stem] = rel
+
+    if os.path.exists(icons_root):
+        for root, _, files in os.walk(icons_root):
+            if "achievements" in root.lower():
+                continue
+            for f in files:
+                if f.lower().endswith(".dds"):
+                    stem = os.path.splitext(f)[0].lower()
+                    rel = "/" + os.path.relpath(os.path.join(root, f), game_folder).replace("\\", "/")
+                    if stem not in dds_by_stem:
+                        dds_by_stem[stem] = rel
+
+    # 1. Parse interface/*.gfx for GFX_ sprite mappings
+    gfx_map = {}
+    interface_dir = os.path.join(game_folder, "interface")
+    if os.path.exists(interface_dir):
+        for root, _, files in os.walk(interface_dir):
+            for f in files:
+                if f.lower().endswith(".gfx"):
+                    try:
+                        with open(os.path.join(root, f), 'r', encoding='utf-8', errors='ignore') as fp:
+                            content = fp.read()
+                        for m in re.finditer(r'\bspriteType\s*=\s*\{', content):
+                            blk = extract_block(content, m.end() - 1)
+                            nm = re.search(r'\bname\s*=\s*"([^"]+)"', blk, re.IGNORECASE)
+                            tf = re.search(r'\btexturefile\s*=\s*"([^"]+)"', blk, re.IGNORECASE)
+                            if nm and tf:
+                                tex_path = "/" + tf.group(1).replace("\\", "/").lstrip("/")
+                                gfx_map[nm.group(1)] = tex_path
+                    except Exception:
+                        pass
+
+    def resolve_icon_ref(ref_str, fallback_stem=None):
+        if ref_str:
+            ref_str = ref_str.strip().strip('"')
+            if ref_str in gfx_map:
+                return gfx_map[ref_str]
+            if f"GFX_{ref_str}" in gfx_map:
+                return gfx_map[f"GFX_{ref_str}"]
+            if ref_str.lower().endswith(".dds"):
+                return "/" + ref_str.replace("\\", "/").lstrip("/")
+            if ref_str.startswith("GFX_"):
+                stem = ref_str[4:].lower()
+                if stem in dds_by_stem:
+                    return dds_by_stem[stem]
+            if ref_str.lower() in dds_by_stem:
+                return dds_by_stem[ref_str.lower()]
+        if fallback_stem:
+            fb_low = fallback_stem.lower()
+            if fb_low in dds_by_stem:
+                return dds_by_stem[fb_low]
+            if f"GFX_{fallback_stem}" in gfx_map:
+                return gfx_map[f"GFX_{fallback_stem}"]
+        return ""
+
+    # 2. Parse component_sets & component_templates for ship part icons
+    comp_icons = {}
+    comp_dirs = [
+        os.path.join(game_folder, "common", "component_sets"),
+        os.path.join(game_folder, "common", "component_templates")
+    ]
+    for cdir in comp_dirs:
+        if not os.path.exists(cdir):
+            continue
+        for root, _, files in os.walk(cdir):
+            for f in files:
+                if not f.endswith(".txt"):
+                    continue
+                try:
+                    with open(os.path.join(root, f), 'r', encoding='utf-8', errors='ignore') as fp:
+                        content = re.sub(r'#.*', '', fp.read())
+                    for b_type, blk in get_named_blocks(content):
+                        k_m = re.search(r'\bkey\s*=\s*"?([^"\s\}]+)"?', blk)
+                        ic_m = re.search(r'\bicon\s*=\s*"?([^"\s\}]+)"?', blk)
+                        cs_m = re.search(r'\bcomponent_set\s*=\s*"?([^"\s\}]+)"?', blk)
+                        if not k_m:
+                            continue
+                        comp_key = k_m.group(1)
+                        icon_path = resolve_icon_ref(ic_m.group(1) if ic_m else "", comp_key)
+                        if icon_path:
+                            comp_icons[comp_key] = icon_path
+                            stripped = re.sub(
+                                r'^(?:SMALL|MEDIUM|LARGE|EXTRA_LARGE|CORVETTE|DESTROYER|CRUISER|BATTLESHIP|TITAN|COLOSSUS|JUGGERNAUT|PLATFORM|STARBASE)_',
+                                '', comp_key
+                            )
+                            if stripped not in comp_icons:
+                                comp_icons[stripped] = icon_path
+                            if cs_m and cs_m.group(1) not in comp_icons:
+                                comp_icons[cs_m.group(1)] = icon_path
+                except Exception:
+                    pass
+
+    # 3. Parse traits, civics, origins, and ethics
+    entity_icons = {}
+    entity_dirs = [
+        os.path.join(game_folder, "common", "traits"),
+        os.path.join(game_folder, "common", "governments", "civics"),
+        os.path.join(game_folder, "common", "ethics")
+    ]
+    for edir in entity_dirs:
+        if not os.path.exists(edir):
+            continue
+        for root, _, files in os.walk(edir):
+            for f in files:
+                if not f.endswith(".txt"):
+                    continue
+                try:
+                    with open(os.path.join(root, f), 'r', encoding='utf-8', errors='ignore') as fp:
+                        content = re.sub(r'#.*', '', fp.read())
+                    for key, blk in get_named_blocks(content):
+                        if key.startswith("@"):
+                            continue
+                        ic_m = re.search(r'\bicon\s*=\s*"?([^"\s\}]+)"?', blk)
+                        pic_m = re.search(r'\bpicture\s*=\s*"?([^"\s\}]+)"?', blk)
+                        raw_ref = ic_m.group(1) if ic_m else (pic_m.group(1) if pic_m else "")
+                        icon_path = resolve_icon_ref(raw_ref, key)
+                        if not icon_path and key.startswith("origin_"):
+                            alt_key = key.replace("origin_", "origins_", 1)
+                            icon_path = resolve_icon_ref("", alt_key)
+                        if icon_path:
+                            entity_icons[key] = icon_path
+                except Exception:
+                    pass
+
+    # 4. Parse technologies (area, tier, icon with area fallback)
+    area_fallback_icons = {
+        "physics": "/gfx/interface/icons/resources/physics_research.dds",
+        "society": "/gfx/interface/icons/resources/society_research.dds",
+        "engineering": "/gfx/interface/icons/resources/engineering_research.dds"
+    }
+    tech_catalog = {}
+    tech_dir = os.path.join(game_folder, "common", "technology")
+    if os.path.exists(tech_dir):
+        for root, _, files in os.walk(tech_dir):
+            for f in files:
+                if not f.endswith(".txt"):
+                    continue
+                try:
+                    with open(os.path.join(root, f), 'r', encoding='utf-8', errors='ignore') as fp:
+                        content = re.sub(r'#.*', '', fp.read())
+                    for key, blk in get_named_blocks(content):
+                        if not key.startswith("tech_"):
+                            continue
+                        area_m = re.search(r'\barea\s*=\s*([a-zA-Z_]+)', blk)
+                        tier_m = re.search(r'\btier\s*=\s*(\d+)', blk)
+                        ic_m = re.search(r'\bicon\s*=\s*"?([^"\s\}]+)"?', blk)
+                        area = area_m.group(1).lower() if area_m else "physics"
+                        tier = int(tier_m.group(1)) if tier_m else 1
+                        icon_path = resolve_icon_ref(ic_m.group(1) if ic_m else "", key)
+                        if not icon_path:
+                            icon_path = area_fallback_icons.get(area, "/gfx/interface/icons/research_icon.dds")
+                        tech_catalog[key] = {
+                            "area": area,
+                            "tier": tier,
+                            "icon": icon_path
+                        }
+                except Exception:
+                    pass
+
+    return comp_icons, entity_icons, tech_catalog
+
+
+def resolve_loc_references(text, loc_dict, depth=0):
+    if not text or '$' not in text or depth > 5:
+        return text
+
+    def repl(match):
+        ref_key = match.group(1)
+        if ref_key in loc_dict:
+            return resolve_loc_references(loc_dict[ref_key], loc_dict, depth + 1)
+        for k in (ref_key.upper(), ref_key.lower()):
+            if k in loc_dict:
+                return resolve_loc_references(loc_dict[k], loc_dict, depth + 1)
+        return ref_key.replace('_', ' ').title()
+
+    return re.sub(r'\$([A-Za-z0-9_\.\-]+)\$', repl, text)
+
+
+def clean_loc(key, loc_dict):
+    if not key:
+        return "None"
+    raw = None
+    if key in loc_dict:
+        raw = loc_dict[key]
+    elif f"{key}_name" in loc_dict:
+        raw = loc_dict[f"{key}_name"]
+    else:
+        stripped = re.sub(
+            r'^(?:SMALL|MEDIUM|LARGE|CORVETTE|DESTROYER|CRUISER|BATTLESHIP|TITAN|COLOSSUS|JUGGERNAUT|PLATFORM|STARBASE)_',
+            '', key
+        )
+        if stripped in loc_dict:
+            raw = loc_dict[stripped]
+
+    if raw:
+        resolved = resolve_loc_references(raw, loc_dict)
+        return re.sub(r'§[A-Za-z!]', '', resolved).strip()
+
+    cleaned = key
+    for prefix in ('trait_', 'civic_', 'origin_', 'ethic_', 'building_', 'district_', 'agenda_', 'tr_', 'tradition_', 'ap_', 'gov_', 'auth_', 'tech_'):
+        if cleaned.startswith(prefix):
+            cleaned = cleaned[len(prefix):]
+            break
+    return cleaned.replace('_', ' ').title()
+
+
+def format_tradition_name(t_key, loc_dict):
+    if t_key.endswith('_adopt'):
+        base = t_key[:-6]
+        tree_key = base.replace('tr_', 'tradition_', 1)
+        tree_name = clean_loc(tree_key, loc_dict) if tree_key in loc_dict else clean_loc(base, loc_dict)
+        return f"Adopted {tree_name} Tree"
+    if t_key.endswith('_finish'):
+        base = t_key[:-7]
+        tree_key = base.replace('tr_', 'tradition_', 1)
+        tree_name = clean_loc(tree_key, loc_dict) if tree_key in loc_dict else clean_loc(base, loc_dict)
+        return f"Finished {tree_name} Tree"
+    return clean_loc(t_key, loc_dict)
+
+
+def extract_gamestate_head(file_or_dir_path, num_bytes=2000):
+    if zipfile.is_zipfile(file_or_dir_path):
+        with zipfile.ZipFile(file_or_dir_path, 'r') as z:
+            if 'gamestate' in z.namelist():
+                with z.open('gamestate') as f:
+                    return f.read(num_bytes).decode('utf-8', errors='ignore')
+    with open(file_or_dir_path, 'r', encoding='utf-8', errors='ignore') as f:
+        return f.read(num_bytes)
+
+
+def extract_gamestate_content(file_or_dir_path):
+    if zipfile.is_zipfile(file_or_dir_path):
+        with zipfile.ZipFile(file_or_dir_path, 'r') as z:
+            if 'gamestate' in z.namelist():
+                return z.read('gamestate').decode('utf-8', errors='ignore')
+    with open(file_or_dir_path, 'r', encoding='utf-8', errors='ignore') as f:
+        return f.read()
 
 
 def resolve_saved_name(block_text, loc_dict, default="Unknown"):
@@ -233,7 +436,17 @@ def format_defense_name(comp_key, loc_dict):
     return label
 
 
-def parse_design_details(d_blk, loc_dict):
+def lookup_comp_icon(comp_key, comp_icons):
+    if comp_key in comp_icons:
+        return comp_icons[comp_key]
+    stripped = re.sub(
+        r'^(?:SMALL|MEDIUM|LARGE|EXTRA_LARGE|CORVETTE|DESTROYER|CRUISER|BATTLESHIP|TITAN|COLOSSUS|JUGGERNAUT|PLATFORM|STARBASE)_',
+        '', comp_key
+    )
+    return comp_icons.get(stripped, "")
+
+
+def parse_design_details(d_blk, loc_dict, comp_icons):
     target_blk = d_blk
     if not re.search(r'\bsection\s*=\s*\{', d_blk):
         gs_m = re.search(r'\bgrowth_stages\s*=\s*\{', d_blk)
@@ -270,25 +483,26 @@ def parse_design_details(d_blk, loc_dict):
             c_slot = c_slot_m.group(1) if c_slot_m else ""
             c_tmpl = c_tmpl_m.group(1)
             c_upper = c_tmpl.upper()
+            c_icon = lookup_comp_icon(c_tmpl, comp_icons)
 
             if c_slot.startswith("AUX_UTILITY") or "AUX" in c_slot:
-                aux_counts[clean_loc(c_tmpl, loc_dict)] += 1
+                aux_counts[(clean_loc(c_tmpl, loc_dict), c_icon)] += 1
             elif "UTILITY" in c_slot:
                 if "ARMOR" in c_upper or "PLATING" in c_upper:
-                    armor_counts[format_defense_name(c_tmpl, loc_dict)] += 1
+                    armor_counts[(format_defense_name(c_tmpl, loc_dict), c_icon)] += 1
                 elif "SHIELD" in c_upper or "DEFLECTOR" in c_upper or "BARRIER" in c_upper:
-                    shield_counts[format_defense_name(c_tmpl, loc_dict)] += 1
+                    shield_counts[(format_defense_name(c_tmpl, loc_dict), c_icon)] += 1
                 else:
-                    aux_counts[clean_loc(c_tmpl, loc_dict)] += 1
+                    aux_counts[(clean_loc(c_tmpl, loc_dict), c_icon)] += 1
             else:
                 w_size = classify_slot_size(c_slot, c_tmpl)
                 w_name = clean_loc(c_tmpl, loc_dict)
-                weapons[(w_size, w_name)] += 1
+                weapons[(w_size, w_name, c_icon)] += 1
 
         sections.append({
             "name": sec_name,
             "slot": sec_slot,
-            "weapons": [{"size": k[0], "name": k[1], "count": v} for k, v in weapons.items()]
+            "weapons": [{"size": k[0], "name": k[1], "icon": k[2], "count": v} for k, v in weapons.items()]
         })
 
     order = {"bow": 0, "mid": 1, "core": 1, "ship": 1, "stern": 2}
@@ -298,16 +512,19 @@ def parse_design_details(d_blk, loc_dict):
     for req_m in re.finditer(r'\brequired_component="([^"]+)"', target_blk):
         rc = req_m.group(1)
         if "EMPTY" not in rc.upper():
-            req_comps.append(clean_loc(rc, loc_dict))
+            req_comps.append({
+                "name": clean_loc(rc, loc_dict),
+                "icon": lookup_comp_icon(rc, comp_icons)
+            })
 
     return {
         "name": resolve_saved_name(d_blk, loc_dict, "Unknown Design"),
         "size": size_label,
         "raw_size": raw_size,
         "sections": sections,
-        "auxiliaries": [{"name": k, "count": v} for k, v in aux_counts.items()],
-        "armor": [{"name": k, "count": v} for k, v in armor_counts.items()],
-        "shields": [{"name": k, "count": v} for k, v in shield_counts.items()],
+        "auxiliaries": [{"name": k[0], "icon": k[1], "count": v} for k, v in aux_counts.items()],
+        "armor": [{"name": k[0], "icon": k[1], "count": v} for k, v in armor_counts.items()],
+        "shields": [{"name": k[0], "icon": k[1], "count": v} for k, v in shield_counts.items()],
         "required": req_comps
     }
 
@@ -334,7 +551,7 @@ def extract_player_names(gamestate_string):
         dead_countries = gamestate_string[dead_country_start:gamestate_string.find('}', dead_country_start)]
         for line in dead_countries.splitlines():
             match = re.match(r'^\s*(\d+)=', line)
-            if match:
+            if match and match.group(1) not in player_map:
                 player_map[match.group(1)] = f"Defeated Player {match.group(1)}"
     return player_map
 
@@ -387,14 +604,20 @@ def extract_country_resources(p_data, res_keys):
 
 
 def extract_empire_progression(p_data):
-    """Extracts government, civics, active agenda, cooldowns, finish modifiers, traditions, and ascension perks."""
+    """Extracts government, ethics, civics, agendas, traditions, ascension perks, and researched technologies."""
     gov_type = ""
     authority = ""
     origin = ""
     civics = []
+    ethics = []
     council_agenda = ""
     council_agenda_progress = 0.0
-    agenda_cooldowns = []
+    cooldown_agendas = []
+
+    ethos_m = re.search(r'\bethos\s*=\s*\{', p_data)
+    if ethos_m:
+        ethos_blk = extract_block(p_data, ethos_m.end() - 1)
+        ethics = re.findall(r'"(ethic_[^"]+)"', ethos_blk)
 
     gov_m = re.search(r'\bgovernment\s*=\s*\{', p_data)
     if gov_m:
@@ -410,19 +633,21 @@ def extract_empire_progression(p_data):
         if civ_m:
             civics = re.findall(r'"([^"]+)"', civ_m.group(1))
 
-        ca_m = re.search(r'\bcouncil_agenda\s*=\s*"([^"]+)"', gov_blk)
-        if ca_m:
-            council_agenda = ca_m.group(1)
-        cap_m = re.search(r'\bcouncil_agenda_progress\s*=\s*([\d\.]+)', gov_blk)
-        if cap_m:
-            council_agenda_progress = float(cap_m.group(1))
-
+        # Remove council_agenda_cooldowns blocks before searching for the active council_agenda
+        gov_blk_no_cd = gov_blk
         for cd_m in re.finditer(r'\bcouncil_agenda_cooldowns\s*=\s*\{', gov_blk):
             cd_blk = extract_block(gov_blk, cd_m.end() - 1)
-            ag_m = re.search(r'\bcouncil_agenda\s*=\s*"([^"]+)"', cd_blk)
-            sd_m = re.search(r'\bstart_date\s*=\s*"([\d\.]+)"', cd_blk)
-            if ag_m:
-                agenda_cooldowns.append((ag_m.group(1), sd_m.group(1) if sd_m else ""))
+            # Use findall so ALL agendas inside council_agenda_cooldowns are captured
+            for ag_name in re.findall(r'\bcouncil_agenda\s*=\s*"([^"]+)"', cd_blk):
+                cooldown_agendas.append(ag_name)
+            gov_blk_no_cd = gov_blk_no_cd.replace(cd_blk, "", 1)
+
+        ca_m = re.search(r'\bcouncil_agenda\s*=\s*"([^"]+)"', gov_blk_no_cd)
+        if ca_m:
+            council_agenda = ca_m.group(1)
+        cap_m = re.search(r'\bcouncil_agenda_progress\s*=\s*([\d\.]+)', gov_blk_no_cd)
+        if cap_m:
+            council_agenda_progress = float(cap_m.group(1))
 
     finish_modifiers = []
     tm_m = re.search(r'\btimed_modifier\s*=\s*\{', p_data)
@@ -440,32 +665,41 @@ def extract_empire_progression(p_data):
     if ap_m:
         ascension_perks = re.findall(r'"([^"]+)"', ap_m.group(1))
 
+    techs = []
+    ts_m = re.search(r'\btech_status\s*=\s*\{', p_data)
+    if ts_m:
+        ts_blk = extract_block(p_data, ts_m.end() - 1)
+        for tm in re.finditer(r'\btechnology\s*=\s*"([^"]+)"\s+level\s*=\s*(\d+)', ts_blk):
+            techs.append((tm.group(1), int(tm.group(2))))
+
     return {
         "gov_type": gov_type,
         "authority": authority,
         "origin": origin,
+        "ethics": ethics,
         "civics": civics,
         "council_agenda": council_agenda,
         "council_agenda_progress": council_agenda_progress,
-        "agenda_cooldowns": agenda_cooldowns,
+        "cooldown_agendas": cooldown_agendas,
         "finish_modifiers": finish_modifiers,
         "traditions": traditions,
-        "ascension_perks": ascension_perks
+        "ascension_perks": ascension_perks,
+        "techs": techs
     }
 
 
-def init_worker(loc_dict, player_pids, system_names):
-    global WORKER_LOC_DICT, WORKER_PLAYER_PIDS, WORKER_SYSTEM_NAMES
+def init_worker(loc_dict, player_pids, comp_icons):
+    global WORKER_LOC_DICT, WORKER_PLAYER_PIDS, WORKER_COMP_ICONS
     WORKER_LOC_DICT = loc_dict
     WORKER_PLAYER_PIDS = set(player_pids)
-    WORKER_SYSTEM_NAMES = system_names
+    WORKER_COMP_ICONS = comp_icons
 
 
 def process_single_save(task):
     index, total_files, date, filepath = task
     loc_dict = WORKER_LOC_DICT
     player_pids = WORKER_PLAYER_PIDS
-    system_names = WORKER_SYSTEM_NAMES
+    comp_icons = WORKER_COMP_ICONS
 
     gamestate = extract_gamestate_content(filepath)
 
@@ -560,7 +794,7 @@ def process_single_save(task):
     if needed_design_ids:
         for d_id, d_blk in get_top_level_blocks(design_block).items():
             if d_id in needed_design_ids:
-                designs[d_id] = parse_design_details(d_blk, loc_dict)
+                designs[d_id] = parse_design_details(d_blk, loc_dict, comp_icons)
 
     # 6. Finalize Ships & Fleets
     ships = {}
@@ -595,13 +829,6 @@ def process_single_save(task):
             continue
 
         f_pow = re.search(r'military_power\s*=\s*([+-]?[\d\.\-]+)', f_blk)
-        sys_name = "Unknown System"
-        coord_m = re.search(r'\bcoordinate\s*=\s*\{', f_blk)
-        if coord_m:
-            coord_blk = extract_block(f_blk, coord_m.end() - 1)
-            orig_m = re.search(r'\borigin\s*=\s*(\d+)', coord_blk)
-            if orig_m and orig_m.group(1) in system_names:
-                sys_name = system_names[orig_m.group(1)]
 
         tot_hp = sum(ships[sid]["hp"] for sid in ship_ids)
         tot_max_hp = sum(ships[sid]["max_hp"] for sid in ship_ids)
@@ -633,7 +860,6 @@ def process_single_save(task):
 
         all_fleets[f_id] = {
             "name": resolve_saved_name(f_blk, loc_dict, f"Fleet {f_id}"),
-            "system": sys_name,
             "power": float(f_pow.group(1)) if f_pow else 0.0,
             "ship_count": len(ship_ids),
             "condition": {
@@ -644,23 +870,55 @@ def process_single_save(task):
             "templates": list(design_groups.values())
         }
 
-    # 7. Assemble Player Stats & Progression Snapshots
+    # 7. Assemble Player Stats & Progression Snapshots (including eliminated empires!)
     player_stats = {}
     player_progression = {}
     empire_names = {}
+    zero_resources = {rk: {"stockpile": 0.0, "balance": 0.0} for rk in RES_KEYS}
 
-    for pid, p_data in player_country_blocks.items():
-        if index == total_files - 1:
-            empire_names[pid] = resolve_saved_name(p_data, loc_dict, None)
+    for pid in player_pids:
+        p_data = player_country_blocks.get(pid)
+        if not p_data:
+            # Country block removed from country.txt -> Empire is completely eliminated on this date
+            player_stats[pid] = {
+                "date": date,
+                "alive": False,
+                "economy_power": 0.0,
+                "tech_power": 0.0,
+                "military_power": 0.0,
+                "owned_planets": 0,
+                "controlled_planets": 0,
+                "government": "Eliminated",
+                "authority": "",
+                "origin": "None",
+                "ethics": [],
+                "civics": [],
+                "active_agenda": "None",
+                "agenda_progress": 0.0,
+                "traits": [],
+                "resources": zero_resources,
+                "fleets": []
+            }
+            continue
+
+        emp_resolved = resolve_saved_name(p_data, loc_dict, None)
+        if emp_resolved:
+            empire_names[pid] = emp_resolved
 
         eco = re.search(r'\beconomy_power\s*=\s*"?([+-]?[\d\.\-]+)"?', p_data)
         tech = re.search(r'\btech_power\s*=\s*"?([+-]?[\d\.\-]+)"?', p_data)
         planets_match = re.search(r'\bowned_planets\s*=\s*\{\s*([^{}]*)\s*\}', p_data)
+        ctrl_match = re.search(r'\bcontrolled_colonies\s*=\s*\{\s*([^{}]*)\s*\}', p_data)
+        is_nomadic = bool(re.search(r'\bis_nomadic\s*=\s*yes\b', p_data))
+
+        owned_planets_count = len(re.findall(r'\d+', planets_match.group(1))) if planets_match else 0
+        controlled_planets_count = len(re.findall(r'\d+', ctrl_match.group(1))) if ctrl_match else owned_planets_count
 
         prog = extract_empire_progression(p_data)
         player_progression[pid] = prog
 
         origin_clean = clean_loc(prog["origin"], loc_dict) if prog["origin"] else "None"
+        ethics_clean = [clean_loc(e, loc_dict) for e in prog["ethics"]]
         civics_clean = [clean_loc(c, loc_dict) for c in prog["civics"]]
         gov_clean = clean_loc(prog["gov_type"], loc_dict) if prog["gov_type"] else ""
         auth_clean = clean_loc(prog["authority"], loc_dict) if prog["authority"] else ""
@@ -680,21 +938,29 @@ def process_single_save(task):
                 owned_fleets_data.append(all_fleets[fid])
                 total_fleet_power += all_fleets[fid]["power"]
 
+        # An empire is alive if it owns at least 1 colony (and controls > 0 or has fleet power) or is an active nomad
+        is_alive = (owned_planets_count > 0 and (controlled_planets_count > 0 or total_fleet_power > 0)) or (is_nomadic and total_fleet_power > 0)
+        display_planets = controlled_planets_count if controlled_planets_count < owned_planets_count else owned_planets_count
+
         player_stats[pid] = {
             "date": date,
-            "economy_power": float(eco.group(1)) if eco else 0.0,
-            "tech_power": float(tech.group(1)) if tech else 0.0,
-            "military_power": total_fleet_power,
-            "owned_planets": len(re.findall(r'\d+', planets_match.group(1))) if planets_match else 0,
-            "government": gov_clean,
+            "alive": is_alive,
+            "economy_power": float(eco.group(1)) if (eco and is_alive) else 0.0,
+            "tech_power": float(tech.group(1)) if (tech and is_alive) else 0.0,
+            "military_power": total_fleet_power if is_alive else 0.0,
+            "owned_planets": display_planets if is_alive else 0,
+            "legal_planets": owned_planets_count,
+            "controlled_planets": controlled_planets_count,
+            "government": gov_clean if is_alive else "Eliminated",
             "authority": auth_clean,
             "origin": origin_clean,
+            "ethics": ethics_clean,
             "civics": civics_clean,
             "active_agenda": active_agenda_clean,
             "agenda_progress": prog["council_agenda_progress"],
             "traits": traits,
-            "resources": resources,
-            "fleets": owned_fleets_data
+            "resources": resources if is_alive else zero_resources,
+            "fleets": owned_fleets_data if is_alive else []
         }
 
     # 8. Extract Planets & Raw Queue Items
@@ -764,6 +1030,14 @@ def main():
     start_time = time.time()
     print(f"\nFound {len(sav_files)} save files. Processing...")
     loc_dict = load_stellaris_localization(game_folder)
+    comp_icons, entity_icons, tech_catalog = build_game_catalog(game_folder)
+
+    ui_icon_map = {}
+    for raw_key, dds_path in entity_icons.items():
+        ui_icon_map[raw_key] = dds_path
+        clean_name = clean_loc(raw_key, loc_dict)
+        if clean_name and clean_name not in ui_icon_map:
+            ui_icon_map[clean_name] = dds_path
 
     print("\n[2/4] Extracting dates and identifying campaign...")
     saves_metadata = []
@@ -784,22 +1058,27 @@ def main():
     saves_metadata.sort(key=lambda x: x['date'])
     campaign_name = re.sub(r'[\\/*?:"<>|]', "", saves_metadata[-1]['name'])
 
+    # Combine players from both the first and last save so players eliminated mid-game keep their real names
+    first_gamestate = extract_gamestate_content(saves_metadata[0]['filepath'])
     latest_gamestate = extract_gamestate_content(saves_metadata[-1]['filepath'])
-    player_map = extract_player_names(latest_gamestate)
+    player_map = extract_player_names(first_gamestate)
+    for pid, pname in extract_player_names(latest_gamestate).items():
+        if pid not in player_map or player_map[pid].startswith("Defeated Player") or player_map[pid].startswith("Ai Empire"):
+            if not pname.startswith("Defeated Player"):
+                player_map[pid] = pname
 
-    system_names = {}
-    gal_obj_block = get_major_block(latest_gamestate, "galactic_object")
-    if gal_obj_block:
-        for sys_id, sys_blk in get_top_level_blocks(gal_obj_block).items():
-            system_names[sys_id] = resolve_saved_name(sys_blk, loc_dict, f"System {sys_id}")
-
-    timeline_data = {"campaign_name": campaign_name, "players": {}}
+    timeline_data = {
+        "campaign_name": campaign_name,
+        "icons": ui_icon_map,
+        "players": {}
+    }
     for pid, pname in player_map.items():
         timeline_data["players"][pid] = {
             "name": pname,
             "empire_name": pname,
             "stats_history": [],
             "empire_events": [],
+            "tech_events": [],
             "planets": {}
         }
 
@@ -818,7 +1097,7 @@ def main():
     with ProcessPoolExecutor(
         max_workers=max_workers,
         initializer=init_worker,
-        initargs=(loc_dict, list(player_map.keys()), system_names)
+        initargs=(loc_dict, list(player_map.keys()), comp_icons)
     ) as executor:
         futures = {executor.submit(process_single_save, t): t[0] for t in tasks}
         for future in as_completed(futures):
@@ -835,16 +1114,35 @@ def main():
             )
 
     # Step 4: Chronological Reconciliation Pass
-    print("\n\n[4/4] Reconciling build orders, traditions, civics, governments, and agendas...")
+    print("\n\n[4/4] Reconciling build orders, technologies, traditions, ethics, civics, and agendas...")
     build_orders = defaultdict(lambda: defaultdict(list))
     seen_construction_ids = set()
     planet_current_owners = {}
     master_colony_map = {}
     master_planet_names = {}
 
-    # State trackers per player for Empire Events
     player_state = {}
     empire_events = defaultdict(list)
+    tech_events = defaultdict(list)
+
+    def make_tech_event(date_str, t_key, level, is_starting):
+        t_meta = tech_catalog.get(t_key, {
+            "area": "physics",
+            "tier": 1,
+            "icon": "/gfx/interface/icons/research_icon.dds"
+        })
+        base_name = clean_loc(t_key, loc_dict)
+        if level > 1:
+            base_name = f"{base_name} (Level {level})"
+        return {
+            "date": date_str,
+            "key": t_key,
+            "name": base_name,
+            "area": t_meta["area"],
+            "tier": t_meta["tier"],
+            "icon": t_meta["icon"],
+            "starting": is_starting
+        }
 
     for res in results:
         if not res:
@@ -852,34 +1150,42 @@ def main():
         date = res["date"]
 
         for pid, stat_obj in res["player_stats"].items():
-            timeline_data["players"][pid]["stats_history"].append(stat_obj)
+            if pid in timeline_data["players"]:
+                timeline_data["players"][pid]["stats_history"].append(stat_obj)
 
         for pid, emp_name in res["empire_names"].items():
-            if emp_name:
+            if emp_name and pid in timeline_data["players"]:
                 timeline_data["players"][pid]["empire_name"] = emp_name
 
-        # Reconcile Empire Progression (Traditions, Perks, Civics, Government, Agendas)
+        # Reconcile Empire Progression & Technologies
         for pid, prog in res["player_progression"].items():
             if pid not in timeline_data["players"]:
                 continue
 
             if pid not in player_state:
-                # Baseline initialization on first save the player appears
                 player_state[pid] = {
                     "gov_type": prog["gov_type"],
                     "authority": prog["authority"],
+                    "ethics": set(prog["ethics"]),
                     "civics": set(prog["civics"]),
                     "traditions": set(prog["traditions"]),
                     "ascension_perks": set(prog["ascension_perks"]),
                     "council_agenda": prog["council_agenda"],
-                    "launched_cooldowns": set(),
-                    "finish_modifiers": set(prog["finish_modifiers"])
+                    "cooldown_agendas": set(prog["cooldown_agendas"]),
+                    "finish_modifiers": set(prog["finish_modifiers"]),
+                    "techs": set(prog["techs"])
                 }
                 if prog["council_agenda"]:
                     empire_events[pid].append({
                         "date": date,
                         "type": "AGENDA_SELECTED",
                         "item": clean_loc(prog["council_agenda"], loc_dict)
+                    })
+                for ag in prog["cooldown_agendas"]:
+                    empire_events[pid].append({
+                        "date": date,
+                        "type": "AGENDA_LAUNCHED",
+                        "item": clean_loc(ag, loc_dict)
                     })
                 for t in prog["traditions"]:
                     empire_events[pid].append({
@@ -893,18 +1199,18 @@ def main():
                         "type": "ASCENSION_PERK",
                         "item": clean_loc(ap, loc_dict)
                     })
-                for ag, start_dt in prog["agenda_cooldowns"]:
-                    if start_dt and start_dt != "1.01.01":
-                        player_state[pid]["launched_cooldowns"].add((ag, start_dt))
-                        empire_events[pid].append({
-                            "date": start_dt,
-                            "type": "AGENDA_LAUNCHED",
-                            "item": clean_loc(ag, loc_dict)
-                        })
+                for t_key, lvl in prog["techs"]:
+                    tech_events[pid].append(make_tech_event(date, t_key, lvl, True))
             else:
                 st = player_state[pid]
 
-                # 1. Traditions unlocked
+                # 1. Technologies researched
+                for t_tuple in prog["techs"]:
+                    if t_tuple not in st["techs"]:
+                        st["techs"].add(t_tuple)
+                        tech_events[pid].append(make_tech_event(date, t_tuple[0], t_tuple[1], False))
+
+                # 2. Traditions unlocked
                 for t in prog["traditions"]:
                     if t not in st["traditions"]:
                         st["traditions"].add(t)
@@ -914,7 +1220,7 @@ def main():
                             "item": format_tradition_name(t, loc_dict)
                         })
 
-                # 2. Ascension Perks unlocked
+                # 3. Ascension Perks unlocked
                 for ap in prog["ascension_perks"]:
                     if ap not in st["ascension_perks"]:
                         st["ascension_perks"].add(ap)
@@ -924,7 +1230,7 @@ def main():
                             "item": clean_loc(ap, loc_dict)
                         })
 
-                # 3. Government or Authority changed
+                # 4. Government or Authority changed
                 new_gov, new_auth = prog["gov_type"], prog["authority"]
                 if (new_gov and new_gov != st["gov_type"]) or (new_auth and new_auth != st["authority"]):
                     old_desc = clean_loc(st["gov_type"] or st["authority"], loc_dict)
@@ -939,7 +1245,22 @@ def main():
                     st["gov_type"] = new_gov
                     st["authority"] = new_auth
 
-                # 4. Civics reformed (added / removed)
+                # 5. Ethics shifted
+                curr_ethics = set(prog["ethics"])
+                if curr_ethics and curr_ethics != st["ethics"]:
+                    added = [clean_loc(e, loc_dict) for e in (curr_ethics - st["ethics"])]
+                    removed = [clean_loc(e, loc_dict) for e in (st["ethics"] - curr_ethics)]
+                    parts = []
+                    if added: parts.append(f"+{', '.join(added)}")
+                    if removed: parts.append(f"-{', '.join(removed)}")
+                    empire_events[pid].append({
+                        "date": date,
+                        "type": "ETHICS_CHANGED",
+                        "item": " / ".join(parts)
+                    })
+                    st["ethics"] = curr_ethics
+
+                # 6. Civics reformed
                 curr_civics = set(prog["civics"])
                 if curr_civics != st["civics"]:
                     added = [clean_loc(c, loc_dict) for c in (curr_civics - st["civics"])]
@@ -954,24 +1275,22 @@ def main():
                     })
                     st["civics"] = curr_civics
 
-                # 5. Agenda Launched (via exact start_date in council_agenda_cooldowns or new _finish modifier)
-                newly_launched_agendas = set()
-                for ag, start_dt in prog["agenda_cooldowns"]:
-                    if not start_dt or start_dt == "1.01.01":
-                        continue
-                    if (ag, start_dt) not in st["launched_cooldowns"]:
-                        st["launched_cooldowns"].add((ag, start_dt))
-                        newly_launched_agendas.add(ag)
-                        empire_events[pid].append({
-                            "date": start_dt,
-                            "type": "AGENDA_LAUNCHED",
-                            "item": clean_loc(ag, loc_dict)
-                        })
+                # 7. Agenda Launched (stamped with save 'date' whenever an agenda enters council_agenda_cooldowns or timed_modifier)
+                curr_cd_agendas = set(prog["cooldown_agendas"])
+                newly_launched = set()
+                for ag in (curr_cd_agendas - st["cooldown_agendas"]):
+                    newly_launched.add(ag)
+                    empire_events[pid].append({
+                        "date": date,
+                        "type": "AGENDA_LAUNCHED",
+                        "item": clean_loc(ag, loc_dict)
+                    })
+                st["cooldown_agendas"] = curr_cd_agendas
 
                 curr_mods = set(prog["finish_modifiers"])
                 for mod in (curr_mods - st["finish_modifiers"]):
                     ag_base = mod[:-7] if mod.endswith("_finish") else mod
-                    if ag_base not in newly_launched_agendas:
+                    if ag_base not in newly_launched:
                         empire_events[pid].append({
                             "date": date,
                             "type": "AGENDA_LAUNCHED",
@@ -979,7 +1298,7 @@ def main():
                         })
                 st["finish_modifiers"] = curr_mods
 
-                # 6. Agenda Selected
+                # 8. Agenda Selected
                 new_ag = prog["council_agenda"]
                 if new_ag != st["council_agenda"]:
                     if new_ag:
@@ -1017,6 +1336,10 @@ def main():
     for pid, evts in empire_events.items():
         if pid in timeline_data["players"]:
             timeline_data["players"][pid]["empire_events"] = sorted(evts, key=lambda x: x["date"])
+
+    for pid, tevts in tech_events.items():
+        if pid in timeline_data["players"]:
+            timeline_data["players"][pid]["tech_events"] = sorted(tevts, key=lambda x: x["date"])
 
     for pid, planets in build_orders.items():
         if pid not in timeline_data["players"]:
