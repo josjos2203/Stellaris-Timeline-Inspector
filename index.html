@@ -5,7 +5,14 @@
     <title>Stellaris Timeline Inspector</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e1e; color: #d4d4d4; margin: 0; padding: 24px 30px; }
-        h1 { color: #569cd6; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; display: flex; justify-content: space-between; align-items: center; }
+        h1 { color: #569cd6; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .header-actions { display: none; gap: 8px; align-items: center; }
+        .header-actions button { font-size: 0.56em; padding: 7px 12px; }
+        .btn-export { background: #1f5c3e; border-color: #2f855a; }
+        .btn-export:hover { background: #27734d; }
+        .btn-print { background: #0e639c; border-color: #1177bb; }
+        .btn-print:hover { background: #1477ba; }
+
         .container { display: flex; flex-direction: column; gap: 16px; }
         
         button, select, input[type="text"] { background: #3c3c3c; color: #fff; border: 1px solid #555; padding: 7px 12px; font-size: 1em; border-radius: 4px; outline: none; cursor: pointer; }
@@ -27,7 +34,7 @@
         .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; box-shadow: 0 0 6px #4caf50; }
         .live-pill.paused .live-dot { background: #888; box-shadow: none; }
 
-        .main-nav { display: flex; gap: 12px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+        .main-nav { display: flex; gap: 12px; border-bottom: 2px solid #333; padding-bottom: 10px; flex-wrap: wrap; }
         .main-nav-btn { background: #252526; border: 1px solid #444; color: #aaa; font-size: 1.05em; font-weight: bold; padding: 10px 22px; border-radius: 6px; display: flex; align-items: center; gap: 8px; }
         .main-nav-btn.active { background: #0e639c; color: #fff; border-color: #1177bb; box-shadow: 0 0 10px rgba(14, 99, 156, 0.4); }
 
@@ -36,7 +43,7 @@
 
         /* Empire Inspector Dashboard */
         .dashboard { gap: 20px; height: 690px; width: 100%; }
-        .panel { background: #252526; padding: 18px; border-radius: 6px; border: 1px solid #333; flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+        .panel { background: #252526; padding: 18px; border-radius: 6px; border: 1px solid #333; flex: 1; display: flex; flex-direction: column; overflow-y: auto; min-width: 0; }
         
         /* Empire Profile CSS */
         .empire-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 12px; gap: 10px; }
@@ -64,14 +71,15 @@
         
         /* Sub-Tabs & Filter Bar */
         .tabs { display: flex; gap: 10px; margin-bottom: 12px; border-bottom: 1px solid #444; padding-bottom: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
-        .tab-group { display: flex; gap: 6px; }
-        .tab-btn { background: transparent; border: none; color: #888; font-weight: bold; cursor: pointer; padding: 5px 10px; font-size: 0.98em; }
+        .tab-group { display: flex; gap: 4px; flex-wrap: wrap; }
+        .tab-btn { background: transparent; border: none; color: #888; font-weight: bold; cursor: pointer; padding: 5px 9px; font-size: 0.94em; }
         .tab-btn.active { color: #4ec9b0; border-bottom: 2px solid #4ec9b0; }
         .filter-group { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
         .filter-btn { font-size: 0.78em; padding: 4px 8px; background: #2d2d30; border: 1px solid #444; color: #aaa; }
         .filter-btn.active { background: #0e639c; color: #fff; border-color: #1177bb; }
-        .tab-content { display: none; flex-grow: 1; overflow-y: auto; }
+        .tab-content { display: none; flex-grow: 1; overflow-y: auto; min-height: 0; }
         .tab-content.active { display: block; }
+        .tab-content.active.flex-tab { display: flex; flex-direction: column; overflow: hidden; }
         
         /* Build & Tech Feed Lists */
         .build-list { list-style: none; padding: 0; margin: 0; }
@@ -91,6 +99,106 @@
         .item-perk { color: #ffd700; font-weight: bold; }
         .item-agenda { color: #4ec9b0; font-weight: bold; }
         .item-gov { color: #ce9178; font-weight: bold; }
+        .item-tech-physics { color: #6cb6ff; font-weight: bold; }
+        .item-tech-society { color: #6ad48b; font-weight: bold; }
+        .item-tech-engineering { color: #f2a65a; font-weight: bold; }
+
+        /* Visual Build Timeline (Swimlane View) */
+        .vt-scroll-wrap { flex: 1; overflow: auto; background: #121417; border: 1px solid #333; border-radius: 5px; position: relative; }
+        .vt-stage { position: relative; min-height: 100%; }
+        .vt-axis-header { position: sticky; top: 0; z-index: 30; height: 42px; background: #1a1d22; border-bottom: 1px solid #3a3e47; }
+        .vt-axis-title { position: absolute; left: 14px; top: 10px; font-size: 0.85em; font-weight: bold; color: #eab308; letter-spacing: 0.6px; text-transform: uppercase; }
+        .vt-year-mark { position: absolute; top: 5px; transform: translateX(-50%); text-align: center; pointer-events: none; }
+        .vt-year-elapsed { font-family: monospace; font-weight: bold; font-size: 0.92em; color: #f5b942; line-height: 1.1; }
+        .vt-year-cal { font-family: monospace; font-size: 0.68em; color: #6e7681; }
+        .vt-gridline { position: absolute; top: 42px; bottom: 0; width: 1px; background: rgba(255, 255, 255, 0.06); pointer-events: none; z-index: 1; }
+        .vt-gridline.minor { background: rgba(255, 255, 255, 0.025); }
+        .vt-now-line { position: absolute; top: 42px; bottom: 0; width: 2px; background: rgba(78, 201, 176, 0.65); pointer-events: none; z-index: 2; }
+
+        .vt-rows { position: relative; z-index: 3; padding: 10px 0 22px 0; }
+        .vt-row { position: relative; height: 68px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+        .vt-row:hover { background: rgba(255, 255, 255, 0.025); }
+        .vt-row.empire-row { height: 64px; background: rgba(197, 134, 192, 0.05); border-bottom: 1px solid rgba(197, 134, 192, 0.22); }
+        .vt-row.physics-row { height: 62px; background: rgba(108, 182, 255, 0.045); border-bottom: 1px solid rgba(108, 182, 255, 0.16); }
+        .vt-row.society-row { height: 62px; background: rgba(106, 212, 139, 0.045); border-bottom: 1px solid rgba(106, 212, 139, 0.16); }
+        .vt-row.engineering-row { height: 62px; background: rgba(242, 166, 90, 0.045); border-bottom: 1px solid rgba(242, 166, 90, 0.24); }
+
+        .vt-planet-label {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            width: 126px; text-align: right; font-weight: bold; font-size: 0.86em;
+            color: #f46a6a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            padding-right: 4px; pointer-events: auto; cursor: default;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+            display: flex; align-items: center; justify-content: flex-end; gap: 5px;
+        }
+        .vt-planet-label img { width: 15px; height: 15px; object-fit: contain; flex: 0 0 15px; }
+        .vt-row.empire-row .vt-planet-label { color: #c586c0; }
+        .vt-row.physics-row .vt-planet-label { color: #6cb6ff; }
+        .vt-row.society-row .vt-planet-label { color: #6ad48b; }
+        .vt-row.engineering-row .vt-planet-label { color: #f2a65a; }
+
+        .vt-bar { position: absolute; top: 50%; height: 2px; background: rgba(212, 220, 230, 0.45); transform: translateY(-50%); border-radius: 1px; pointer-events: none; }
+        .vt-row.empire-row .vt-bar { background: rgba(197, 134, 192, 0.45); }
+        .vt-row.physics-row .vt-bar { background: rgba(108, 182, 255, 0.45); }
+        .vt-row.society-row .vt-bar { background: rgba(106, 212, 139, 0.45); }
+        .vt-row.engineering-row .vt-bar { background: rgba(242, 166, 90, 0.45); }
+
+        .vt-stem {
+            position: absolute; width: 1.5px; background: rgba(255, 255, 255, 0.3);
+            transform: translateX(-50%); pointer-events: none; z-index: 4;
+        }
+        .vt-node {
+            position: absolute; transform: translate(-50%, -50%);
+            width: 30px; height: 30px; border-radius: 5px;
+            background: #14181e; border: 1.5px solid #38bdf8;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; z-index: 6;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.75);
+            transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+        }
+        .vt-node img { width: 24px; height: 24px; object-fit: contain; pointer-events: none; }
+        .vt-node.colonized { border-color: #4caf50; background: #132218; }
+        .vt-node.lost { border-color: #f44336; background: #291414; }
+        .vt-node.tradition { border-color: #c586c0; background: #221626; }
+        .vt-node.perk { border-color: #ffd700; background: #262112; }
+        .vt-node.agenda { border-color: #4ec9b0; background: #122421; }
+        .vt-node.gov { border-color: #ce9178; background: #261a15; }
+        .vt-node.physics { border-color: #6cb6ff; background: #112236; }
+        .vt-node.society { border-color: #6ad48b; background: #11291b; }
+        .vt-node.engineering { border-color: #f2a65a; background: #2b1d0e; }
+        .vt-node:hover, .vt-node.selected {
+            z-index: 25;
+            transform: translate(-50%, -50%) scale(1.28);
+            border-color: #ffffff;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.65);
+        }
+        .vt-node-count {
+            position: absolute; bottom: -4px; right: -4px;
+            background: #0e639c; color: #fff; border: 1px solid #1e1e1e;
+            font-size: 0.66em; font-weight: bold; font-family: monospace;
+            padding: 0 3px; border-radius: 3px; line-height: 1.3; pointer-events: none;
+        }
+
+        .vt-detail-bar {
+            margin-top: 8px; padding: 8px 12px; background: #1a1d22; border: 1px solid #383c44;
+            border-radius: 5px; font-size: 0.85em; min-height: 22px; color: #ccc;
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        }
+        .vt-detail-item { display: inline-flex; align-items: center; gap: 5px; }
+        .vt-tooltip {
+            position: fixed; z-index: 9999; pointer-events: none; display: none;
+            background: rgba(18, 22, 27, 0.97); border: 1px solid #4ec9b0; border-radius: 5px;
+            padding: 8px 11px; max-width: 320px; font-size: 0.84em; line-height: 1.4;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7); color: #e6e6e6;
+        }
+        .vt-tooltip-head { color: #f46a6a; font-weight: bold; margin-bottom: 4px; display: flex; justify-content: space-between; gap: 12px; }
+        .vt-tooltip-head.empire { color: #c586c0; }
+        .vt-tooltip-head.physics { color: #6cb6ff; }
+        .vt-tooltip-head.society { color: #6ad48b; }
+        .vt-tooltip-head.engineering { color: #f2a65a; }
+        .vt-tooltip-date { color: #dcdcaa; font-family: monospace; font-size: 0.9em; }
+        .vt-tooltip ul { list-style: none; margin: 4px 0 0 0; padding: 0; }
+        .vt-tooltip li { margin: 3px 0; display: flex; align-items: center; gap: 6px; }
         
         /* Fleets & 48x48 Weapon Icon Tiles */
         .fleet-box { border: 1px solid #444; border-radius: 6px; margin-bottom: 12px; background: #1e1e1e; overflow: hidden; }
@@ -147,13 +255,56 @@
         .lb-bar.eco { background: rgba(220, 220, 170, 0.16); }
         .lb-bar.tech { background: rgba(86, 156, 214, 0.2); }
         .lb-val { position: relative; z-index: 1; font-family: monospace; font-weight: bold; }
+
+        /* Galaxy & Spawn Map View */
+        .map-layout { display: flex; gap: 20px; width: 100%; height: 690px; }
+        .map-canvas-wrap { position: relative; flex: 1; background: radial-gradient(circle at center, #0a1218 0%, #050709 100%); border: 1px solid #333; border-radius: 6px; overflow: hidden; }
+        #galaxy-canvas { width: 100%; height: 100%; display: block; cursor: grab; }
+        #galaxy-canvas:active { cursor: grabbing; }
+        #map-print-img { display: none; width: 100%; height: auto; border-radius: 6px; border: 1px solid #333; }
+        .map-overlay-bar { position: absolute; top: 12px; left: 12px; display: flex; gap: 8px; align-items: center; background: rgba(20, 24, 28, 0.88); padding: 6px 10px; border-radius: 6px; border: 1px solid #333; flex-wrap: wrap; }
+        .map-sidebar { width: 340px; background: #252526; border: 1px solid #333; border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+        .map-section-title { font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.8px; color: #9cdcfe; border-bottom: 1px solid #3e3e42; padding-bottom: 5px; margin-bottom: 8px; font-weight: bold; }
+        .map-layer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.86em; }
+        .map-layer-item { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; color: #ccc; }
+        .map-legend-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; font-size: 0.82em; }
+        .legend-row { display: flex; align-items: center; gap: 7px; color: #bbb; }
+        .legend-swatch { width: 12px; height: 12px; border-radius: 2px; display: inline-block; flex: 0 0 12px; border: 1px solid rgba(255,255,255,0.4); }
+        .legend-line { width: 16px; height: 3px; display: inline-block; flex: 0 0 16px; }
+        .sys-inspector-box { background: #1e1e1e; border: 1px solid #3a3a3d; border-radius: 5px; padding: 12px; font-size: 0.9em; line-height: 1.45; }
+
+        /* Clean Print / PDF Layout */
+        @media print {
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            body { padding: 12px; background-color: #1e1e1e !important; color: #d4d4d4 !important; }
+            #landing, .header-actions, .main-nav, #timeline-slider, #live-follow-pill,
+            .filter-group, .map-overlay-bar, #lb-search, #lb-filter-active, #player-select,
+            .vt-tooltip { display: none !important; }
+            .scrubber-panel { padding: 8px 12px; margin-bottom: 10px; }
+            .dashboard { flex-direction: column !important; height: auto !important; gap: 14px; }
+            .panel, .leaderboard-panel, .tab-content, .tab-content.active.flex-tab {
+                height: auto !important; max-height: none !important; overflow: visible !important;
+            }
+            .tab-btn:not(.active) { display: none !important; }
+            .vt-scroll-wrap { overflow: visible !important; }
+            .map-layout { flex-direction: column !important; height: auto !important; }
+            .map-canvas-wrap { overflow: visible !important; border: none !important; }
+            #galaxy-canvas { display: none !important; }
+            #map-print-img { display: block !important; }
+            .map-sidebar { width: auto !important; overflow: visible !important; }
+            .fleet-box, .ship-group, .lb-row { break-inside: avoid; }
+        }
     </style>
 </head>
 <body>
 
     <h1>
-        <span>Stellaris Timeline Inspector</span>
-        <button id="btn-back" style="display:none; font-size: 0.65em;" onclick="location.reload()">Back to Menu</button>
+        <span id="app-title">Stellaris Timeline Inspector</span>
+        <div id="header-actions" class="header-actions">
+            <button id="btn-export-html" class="btn-export" onclick="exportCurrentViewHtml()" title="Save the current tab as a standalone offline HTML file with all icons embedded">💾 Save Offline HTML</button>
+            <button id="btn-print" class="btn-print" onclick="printCurrentView()" title="Print or Save the current tab as PDF">🖨️ Print / PDF</button>
+            <button id="btn-back" onclick="location.reload()">Back to Menu</button>
+        </div>
     </h1>
     
     <!-- LANDING MENU -->
@@ -188,12 +339,13 @@
         <div class="main-nav">
             <button id="nav-empire-btn" class="main-nav-btn active" onclick="switchMainView('view-empire', this)">🏛️ Empire Inspector</button>
             <button id="nav-lb-btn" class="main-nav-btn" onclick="switchMainView('view-leaderboard', this)">🏆 Live Leaderboard</button>
+            <button id="nav-map-btn" class="main-nav-btn" onclick="switchMainView('view-map', this)">🌌 Galaxy &amp; Spawn Map</button>
         </div>
         
         <!-- VIEW 1: EMPIRE INSPECTOR -->
         <div id="view-empire" class="main-view dashboard active">
             <!-- LEFT PANEL: EMPIRE PROFILE -->
-            <div class="panel" style="flex: 1.15;">
+            <div class="panel" id="empire-profile-panel" style="flex: 1.1;">
                 <div class="empire-header">
                     <select id="player-select" style="width: 230px; margin: 0;"></select>
                     <h2 id="emp-name">Empire Name</h2>
@@ -214,18 +366,28 @@
             </div>
             
             <!-- RIGHT PANEL: PLAYER SUB-TABS -->
-            <div class="panel" style="flex: 1.35;">
+            <div class="panel" style="flex: 1.4;">
                 <div class="tabs">
                     <div class="tab-group">
-                        <button class="tab-btn active" onclick="switchSubTab('tab-builds', this)">Timeline Feed</button>
-                        <button class="tab-btn" onclick="switchSubTab('tab-techs', this)">Tech Research</button>
-                        <button class="tab-btn" onclick="switchSubTab('tab-fleets', this)">Military Fleets</button>
+                        <button class="tab-btn active" data-tab="tab-builds" onclick="switchSubTab('tab-builds', this)">Timeline Feed</button>
+                        <button class="tab-btn" data-tab="tab-visual-timeline" onclick="switchSubTab('tab-visual-timeline', this)">Build Timeline</button>
+                        <button class="tab-btn" data-tab="tab-techs" onclick="switchSubTab('tab-techs', this)">Tech Research</button>
+                        <button class="tab-btn" data-tab="tab-fleets" onclick="switchSubTab('tab-fleets', this)">Military Fleets</button>
                     </div>
                     <!-- Feed Filters -->
                     <div class="filter-group" id="feed-filters">
                         <button class="filter-btn active" onclick="setFeedFilter('ALL', this)">All</button>
                         <button class="filter-btn" onclick="setFeedFilter('EMPIRE', this)">Empire Events</button>
                         <button class="filter-btn" onclick="setFeedFilter('PLANET', this)">Planet Builds</button>
+                    </div>
+                    <!-- Visual Timeline Controls -->
+                    <div class="filter-group" id="visual-timeline-controls" style="display:none;">
+                        <button class="filter-btn active" id="btn-vt-empire" onclick="toggleVtEmpireRow(this)">+ Empire Row</button>
+                        <button class="filter-btn active" id="btn-vt-techs" onclick="toggleVtTechRows(this)">+ Tech Rows</button>
+                        <label style="font-size:0.78em; color:#aaa; display:flex; align-items:center; gap:5px;">
+                            Zoom
+                            <input type="range" id="vt-zoom-slider" min="16" max="120" value="44" oninput="setVtZoom(this.value)" style="width:80px; cursor:pointer;">
+                        </label>
                     </div>
                     <!-- Tech Filters -->
                     <div class="filter-group" id="tech-filters" style="display:none;">
@@ -239,6 +401,15 @@
                 
                 <div id="tab-builds" class="tab-content active">
                     <ul class="build-list" id="build-feed"></ul>
+                </div>
+
+                <div id="tab-visual-timeline" class="tab-content flex-tab">
+                    <div class="vt-scroll-wrap" id="vt-scroll-wrap">
+                        <div class="vt-stage" id="vt-stage"></div>
+                    </div>
+                    <div class="vt-detail-bar" id="vt-detail-bar">
+                        <span style="color:#888;">Hover over any icon to inspect builds or techs, or click an icon to pin its details here.</span>
+                    </div>
                 </div>
 
                 <div id="tab-techs" class="tab-content">
@@ -262,7 +433,7 @@
                     </div>
                     <input type="text" id="lb-search" placeholder="Search player or empire..." oninput="renderLeaderboard()">
                 </div>
-                <table class="lb-table">
+                <table class="lb-table" id="lb-table">
                     <thead>
                         <tr>
                             <th>#</th>
@@ -281,7 +452,74 @@
                 </table>
             </div>
         </div>
+
+        <!-- VIEW 3: STATIC GALAXY & SPAWN MAP -->
+        <div id="view-map" class="main-view">
+            <div class="map-layout">
+                <div class="map-canvas-wrap">
+                    <canvas id="galaxy-canvas"></canvas>
+                    <img id="map-print-img" alt="Galaxy Map Snapshot">
+                    <div class="map-overlay-bar">
+                        <button onclick="GalaxySpawnMap.fitView()" style="font-size:0.85em; padding:5px 10px;">Reset Zoom</button>
+                        <button onclick="downloadMapPng()" style="font-size:0.85em; padding:5px 10px; background:#1f5c3e; border-color:#2f855a;">📷 Save PNG</button>
+                        <input type="text" id="map-search" placeholder="Find system or player..." oninput="GalaxySpawnMap.draw()" style="font-size:0.85em; padding:5px 8px; width:180px;">
+                        <span id="map-summary-badge" style="font-size:0.82em; color:#aaa;"></span>
+                    </div>
+                </div>
+                <div class="map-sidebar">
+                    <div>
+                        <div class="map-section-title">Selected / Hovered System</div>
+                        <div id="map-sys-details" class="sys-inspector-box">
+                            <span style="color:#888;">Hover or click any star system on the map to inspect its spawn status, hyperlanes, and points of interest.</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="map-section-title">Map Layers</div>
+                        <div class="map-layer-grid">
+                            <label class="map-layer-item"><input type="checkbox" id="layer-reach" checked onchange="GalaxySpawnMap.draw()"> 5-Jump Spawn Check</label>
+                            <label class="map-layer-item"><input type="checkbox" id="layer-conflicts" checked onchange="GalaxySpawnMap.draw()"> Illegal Conflicts</label>
+                            <label class="map-layer-item"><input type="checkbox" id="layer-hw-labels" checked onchange="GalaxySpawnMap.draw()"> Player Labels</label>
+                            <label class="map-layer-item"><input type="checkbox" id="layer-t1t2" checked onchange="GalaxySpawnMap.draw()"> T1/T2 Neighbors</label>
+                            <label class="map-layer-item"><input type="checkbox" id="layer-enclaves" checked onchange="GalaxySpawnMap.draw()"> Enclaves</label>
+                            <label class="map-layer-item"><input type="checkbox" id="layer-fe-mar" checked onchange="GalaxySpawnMap.draw()"> FE &amp; Marauders</label>
+                            <label class="map-layer-item"><input type="checkbox" id="layer-wanderlust" checked onchange="GalaxySpawnMap.draw()"> Wanderlust POIs</label>
+                            <label class="map-layer-item"><input type="checkbox" id="layer-sys-names" onchange="GalaxySpawnMap.draw()"> All Star Names</label>
+                        </div>
+                    </div>
+
+                    <div id="map-legend-block">
+                        <div class="map-section-title">Spawn &amp; POI Legend</div>
+                        <div class="map-legend-list">
+                            <div class="legend-row"><span class="legend-swatch" style="background:#ffd700; border-radius:50%;"></span> Homeworld</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#ff9800; border-radius:50%;"></span> T1/T2 Guaranteed</div>
+                            <div class="legend-row"><span class="legend-line" style="background:#65d788;"></span> 5-Jump Spawn Reach</div>
+                            <div class="legend-row"><span class="legend-line" style="background:#ff3b30;"></span> Illegal Spawn Clash</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#ffffff;"></span> Fallen Empire</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#ff4081;"></span> Marauder Clan</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#3b82f6;"></span> Curators Enclave</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#a855f7;"></span> Shroudwalker</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#ec4899;"></span> Artists Enclave</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#22c55e;"></span> Traders Enclave</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#a16207;"></span> Salvager Enclave</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#eab308;"></span> Mercenary Enclave</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#ef4444;"></span> Mindwarden Enclave</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#00ffff;"></span> Ancient Wonder</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#ff00ff;"></span> Galactic Landmark</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#32cd32;"></span> Natural Spectacle</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#14b8a6;"></span> Precursor System</div>
+                            <div class="legend-row"><span class="legend-swatch" style="background:#a3e635;"></span> Space Ecology</div>
+                        </div>
+                    </div>
+
+                    <div id="map-conflict-summary"></div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- FLOATING TOOLTIP FOR BUILD TIMELINE -->
+    <div id="vt-tooltip" class="vt-tooltip"></div>
 
     <script>
         let timelineData = null;
@@ -296,7 +534,13 @@
         let lbSortAsc = false;
         let lbActiveOnly = true;
 
-        // Track collapsed fleet names so live updates never re-open a fleet the user closed
+        // Visual Build Timeline state
+        let vtZoom = 44; // pixels per year
+        let vtShowEmpireRow = true;
+        let vtShowTechRows = true;
+        let vtTickRegistry = [];
+        let vtSelectedKey = null;
+
         const closedFleetNames = new Set();
 
         // Reliable DDS Cache & Concurrency Queue
@@ -507,9 +751,1088 @@
             });
         }
 
+        async function ensureDdsHydrated(root) {
+            if (!root) return;
+            const imgs = Array.from(root.querySelectorAll('img[data-dds]'));
+            await Promise.all(imgs.map(async img => {
+                const path = img.getAttribute('data-dds');
+                if (!path) return;
+                try {
+                    const url = await loadDdsUrl(path);
+                    img.src = url;
+                    img.style.display = '';
+                } catch (_) {
+                    img.style.display = 'none';
+                }
+            }));
+        }
+
         function getIconPath(name) {
             if (!timelineData || !timelineData.icons || !name) return "";
             return timelineData.icons[name] || "";
+        }
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function safeFilenamePart(str) {
+            return String(str || 'export').replace(/[^a-zA-Z0-9_\-\.]+/g, '_').replace(/^_+|_+$/g, '') || 'export';
+        }
+
+        function dateToElapsedYears(dateStr, baseYear = 2200) {
+            if (!dateStr) return 0;
+            const parts = dateStr.split('.').map(Number);
+            const y = parts[0] || baseYear;
+            const m = (parts[1] || 1) - 1;
+            const d = (parts[2] || 1) - 1;
+            return Math.max(0, (y - baseYear) + (m / 12) + (d / 360));
+        }
+
+        function formatEventLabel(ev) {
+            if (ev.type === "TECH") return { text: ev.item, cls: `item-tech-${ev.area || 'physics'}` };
+            if (ev.type === "COLONIZED") return { text: "Colonized / Settled", cls: "item-conquest" };
+            if (ev.type === "TAKEN") return { text: `Conquered from ${ev.item}`, cls: "item-conquest" };
+            if (ev.type === "LOST") return { text: `Lost to ${ev.item}`, cls: "item-loss" };
+            if (ev.type === "TRADITION") return { text: `Tradition: ${ev.item}`, cls: "item-tradition" };
+            if (ev.type === "ASCENSION_PERK") return { text: `Ascension Perk: ${ev.item}`, cls: "item-perk" };
+            if (ev.type === "AGENDA_SELECTED") return { text: `Agenda Selected: ${ev.item}`, cls: "item-agenda" };
+            if (ev.type === "AGENDA_LAUNCHED") return { text: `Agenda Launched: ${ev.item}`, cls: "item-agenda" };
+            if (ev.type === "CIVICS_CHANGED") return { text: `Civics Reformed: ${ev.item}`, cls: "item-gov" };
+            if (ev.type === "ETHICS_CHANGED") return { text: `Ethics Shifted: ${ev.item}`, cls: "item-gov" };
+            if (ev.type === "GOV_CHANGED") return { text: `Government Reformed: ${ev.item}`, cls: "item-gov" };
+            return { text: `Built: ${ev.item}`, cls: "item-build" };
+        }
+
+        function resolveEventIcon(ev) {
+            if (ev) {
+                if (ev.icon) return ev.icon;
+                if (ev.key) {
+                    const byKey = getIconPath(ev.key) || getIconPath(ev.key.toLowerCase());
+                    if (byKey) return byKey;
+                }
+                if (ev.item) {
+                    const byItem = getIconPath(ev.item);
+                    if (byItem) return byItem;
+                }
+                if (ev.type === "TECH") return `/gfx/interface/icons/resources/${ev.area || 'physics'}_research.dds`;
+                if (ev.type === "COLONIZED") return "/gfx/interface/icons/icon_colony_ship.dds";
+                if (ev.type === "TAKEN") return "/gfx/interface/icons/occupation_flag.dds";
+                if (ev.type === "LOST") return "/gfx/interface/icons/planet_invasion.dds";
+                if (ev.type === "TRADITION") return "/gfx/interface/icons/menu_icon_traditions.dds";
+                if (ev.type === "ASCENSION_PERK") return "/gfx/interface/icons/navbar_icons_traditions.dds";
+                if (ev.type === "AGENDA_SELECTED" || ev.type === "AGENDA_LAUNCHED") return "/gfx/interface/council_view/icon_agenda.dds";
+                if (ev.type === "ETHICS_CHANGED") return "/gfx/interface/council_view/icon_ethics.dds";
+                if (ev.type === "GOV_CHANGED" || ev.type === "CIVICS_CHANGED") return "/gfx/interface/icons/gamesetup_gov_sel.dds";
+                if (ev.type === "BUILD") {
+                    const rawKey = (ev.key || "").toLowerCase();
+                    const itemLow = (ev.item || "").toLowerCase();
+                    if (rawKey.startsWith("district_") || itemLow.includes("district")) {
+                        return "/gfx/interface/icons/district.dds";
+                    }
+                    return "/gfx/interface/icons/building_icon.dds";
+                }
+            }
+            return "/gfx/interface/icons/building_icon.dds";
+        }
+
+        // --- VISUAL BUILD TIMELINE (SWIMLANE VIEW WITH TECH & BUILDING ICONS) ---
+        function setVtZoom(val) {
+            vtZoom = parseInt(val, 10) || 44;
+            updateView(true);
+        }
+
+        function toggleVtEmpireRow(btn) {
+            vtShowEmpireRow = !vtShowEmpireRow;
+            btn.classList.toggle('active', vtShowEmpireRow);
+            updateView(true);
+        }
+
+        function toggleVtTechRows(btn) {
+            vtShowTechRows = !vtShowTechRows;
+            btn.classList.toggle('active', vtShowTechRows);
+            updateView(true);
+        }
+
+        function getTickClass(events, rowType) {
+            if (rowType === 'physics' || rowType === 'society' || rowType === 'engineering') {
+                return rowType;
+            }
+            const types = new Set(events.map(e => e.type));
+            if (rowType === 'empire') {
+                if (types.has('ASCENSION_PERK')) return 'perk';
+                if (types.has('TRADITION')) return 'tradition';
+                if (types.has('AGENDA_LAUNCHED') || types.has('AGENDA_SELECTED')) return 'agenda';
+                return 'gov';
+            }
+            if (types.has('LOST')) return 'lost';
+            if (types.has('COLONIZED') || types.has('TAKEN')) return 'colonized';
+            return '';
+        }
+
+        function getRowColor(rowType) {
+            if (rowType === 'empire') return '#c586c0';
+            if (rowType === 'physics') return '#6cb6ff';
+            if (rowType === 'society') return '#6ad48b';
+            if (rowType === 'engineering') return '#f2a65a';
+            return '#f46a6a';
+        }
+
+        function buildTickDetailHtml(info) {
+            const headCls = info.rowType && info.rowType !== 'planet' ? `vt-tooltip-head ${info.rowType}` : 'vt-tooltip-head';
+            const itemsHtml = info.events.map(ev => {
+                const { text, cls } = formatEventLabel(ev);
+                const iconPath = resolveEventIcon(ev);
+                return `<li><img class="game-icon" data-dds="${iconPath}"><span class="${cls}">${escapeHtml(text)}</span></li>`;
+            }).join('');
+            return `
+                <div class="${headCls}">
+                    <span>${escapeHtml(info.sourceName)}</span>
+                    <span class="vt-tooltip-date">Yr ${info.elapsed.toFixed(1)} (${info.date})</span>
+                </div>
+                <ul>${itemsHtml}</ul>
+            `;
+        }
+
+        function renderRowNodes(byDateMap, rowKeyPrefix, sourceName, rowType, baseYear, leftPad) {
+            const slotLastX = { center: -999, top: -999, bot: -999 };
+            const minGap = 32;
+            let html = '';
+
+            const sortedEntries = Array.from(byDateMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+            for (const [dStr, evList] of sortedEntries) {
+                const elapsed = dateToElapsedYears(dStr, baseYear);
+                const x = leftPad + elapsed * vtZoom;
+                const key = `${rowKeyPrefix}::${dStr}`;
+                const idx = vtTickRegistry.length;
+                vtTickRegistry.push({ key, sourceName, date: dStr, elapsed, events: evList, rowType });
+
+                let slot = 'center';
+                if (x - slotLastX.center >= minGap) {
+                    slot = 'center';
+                } else if (x - slotLastX.top >= minGap) {
+                    slot = 'top';
+                } else if (x - slotLastX.bot >= minGap) {
+                    slot = 'bot';
+                } else {
+                    const order = [
+                        ['top', slotLastX.top],
+                        ['bot', slotLastX.bot],
+                        ['center', slotLastX.center]
+                    ].sort((a, b) => a[1] - b[1]);
+                    slot = order[0][0];
+                }
+                slotLastX[slot] = x;
+
+                const topPct = slot === 'top' ? 26 : (slot === 'bot' ? 74 : 50);
+                let stemHtml = '';
+                if (slot === 'top') {
+                    stemHtml = `<div class="vt-stem" style="left:${x}px; top:26%; height:24%;"></div>`;
+                } else if (slot === 'bot') {
+                    stemHtml = `<div class="vt-stem" style="left:${x}px; top:50%; height:24%;"></div>`;
+                }
+
+                const primaryEv = evList.find(e => e.type === 'BUILD' || e.type === 'TECH' || e.type === 'ASCENSION_PERK' || e.type === 'TRADITION') || evList[0];
+                const iconPath = resolveEventIcon(primaryEv);
+                const tCls = getTickClass(evList, rowType);
+                const selCls = (vtSelectedKey === key) ? ' selected' : '';
+                const countBadge = evList.length > 1 ? `<span class="vt-node-count">×${evList.length}</span>` : '';
+
+                html += `
+                    ${stemHtml}
+                    <div class="vt-node ${tCls}${selCls}" style="left:${x}px; top:${topPct}%;" data-tick-idx="${idx}">
+                        <img data-dds="${iconPath}" alt="${escapeHtml(primaryEv.item || primaryEv.type)}">
+                        ${countBadge}
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function renderVisualTimeline(player, currentDate, preserveScroll = false) {
+            const scrollWrap = document.getElementById('vt-scroll-wrap');
+            const stage = document.getElementById('vt-stage');
+            if (!scrollWrap || !stage || !player) return;
+
+            const prevLeft = scrollWrap.scrollLeft;
+            const prevTop = scrollWrap.scrollTop;
+
+            const baseYear = globalDates.length ? (parseInt(globalDates[0].split('.')[0], 10) || 2200) : 2200;
+            const currentElapsed = dateToElapsedYears(currentDate, baseYear);
+            const maxAxisYear = Math.max(25, Math.ceil((currentElapsed + 1) / 5) * 5);
+
+            const leftPad = 148;
+            const rightPad = 56;
+            const totalWidth = leftPad + (maxAxisYear * vtZoom) + rightPad;
+            const nowX = leftPad + (currentElapsed * vtZoom);
+
+            vtTickRegistry = [];
+
+            let axisMarksHtml = `<div class="vt-axis-title">Years</div>`;
+            let gridlinesHtml = '';
+
+            for (let yr = 0; yr <= maxAxisYear; yr += 5) {
+                const x = leftPad + yr * vtZoom;
+                axisMarksHtml += `
+                    <div class="vt-year-mark" style="left:${x}px;">
+                        <div class="vt-year-elapsed">${yr}</div>
+                        <div class="vt-year-cal">${baseYear + yr}</div>
+                    </div>
+                `;
+                gridlinesHtml += `<div class="vt-gridline" style="left:${x}px;"></div>`;
+            }
+
+            if (vtZoom >= 42) {
+                for (let yr = 1; yr <= maxAxisYear; yr++) {
+                    if (yr % 5 === 0) continue;
+                    const x = leftPad + yr * vtZoom;
+                    gridlinesHtml += `<div class="vt-gridline minor" style="left:${x}px;"></div>`;
+                }
+            }
+
+            const nowLineHtml = `<div class="vt-now-line" style="left:${nowX}px;" title="Current Date: ${currentDate}"></div>`;
+            const fullBarW = Math.max(4, nowX - leftPad);
+
+            let rowsHtml = '';
+
+            // 1. Optional Empire Milestones Row
+            if (vtShowEmpireRow && player.empire_events && player.empire_events.length > 0) {
+                const empEvts = player.empire_events.filter(e => e.date <= currentDate);
+                if (empEvts.length > 0) {
+                    const byDate = new Map();
+                    empEvts.forEach(ev => {
+                        if (!byDate.has(ev.date)) byDate.set(ev.date, []);
+                        byDate.get(ev.date).push(ev);
+                    });
+
+                    const nodesHtml = renderRowNodes(byDate, 'EMPIRE', 'Empire Events', 'empire', baseYear, leftPad);
+                    rowsHtml += `
+                        <div class="vt-row empire-row">
+                            <div class="vt-planet-label" style="left:${leftPad - 138}px;" title="Empire Milestones (Traditions, Perks, Agendas, Reforms)">EMPIRE</div>
+                            <div class="vt-bar" style="left:${leftPad}px; width:${fullBarW}px;"></div>
+                            ${nodesHtml}
+                        </div>
+                    `;
+                }
+            }
+
+            // 2. Optional 3 Research Rows (Physics, Society, Engineering)
+            if (vtShowTechRows && player.tech_events) {
+                const techAreas = [
+                    { id: 'physics', label: 'PHYSICS', title: 'Physics Research', icon: '/gfx/interface/icons/resources/physics_research.dds' },
+                    { id: 'society', label: 'SOCIETY', title: 'Society Research', icon: '/gfx/interface/icons/resources/society_research.dds' },
+                    { id: 'engineering', label: 'ENGINEERING', title: 'Engineering Research', icon: '/gfx/interface/icons/resources/engineering_research.dds' }
+                ];
+
+                for (const area of techAreas) {
+                    const areaEvts = player.tech_events
+                        .filter(t => t.date <= currentDate && !t.starting && (t.area || 'physics') === area.id)
+                        .map(t => ({
+                            date: t.date,
+                            type: 'TECH',
+                            item: `${t.name} (T${t.tier || 1})`,
+                            area: area.id,
+                            icon: t.icon || area.icon,
+                            key: t.key
+                        }));
+
+                    const byDate = new Map();
+                    areaEvts.forEach(ev => {
+                        if (!byDate.has(ev.date)) byDate.set(ev.date, []);
+                        byDate.get(ev.date).push(ev);
+                    });
+
+                    const nodesHtml = renderRowNodes(byDate, `TECH_${area.id}`, area.title, area.id, baseYear, leftPad);
+                    rowsHtml += `
+                        <div class="vt-row ${area.id}-row">
+                            <div class="vt-planet-label" style="left:${leftPad - 138}px;" title="${area.title} (${areaEvts.length} unlocked)">
+                                <img data-dds="${area.icon}" alt="${area.label}"><span>${area.label}</span>
+                            </div>
+                            <div class="vt-bar" style="left:${leftPad}px; width:${fullBarW}px;"></div>
+                            ${nodesHtml}
+                        </div>
+                    `;
+                }
+            }
+
+            // 3. Staggered Planetary Build Swimlanes
+            const planetEntries = [];
+            for (const [planetId, pObj] of Object.entries(player.planets || {})) {
+                const evs = (pObj.builds || [])
+                    .filter(b => b.date <= currentDate)
+                    .sort((a, b) => a.date.localeCompare(b.date));
+                if (evs.length === 0) continue;
+
+                const startElapsed = dateToElapsedYears(evs[0].date, baseYear);
+
+                const segments = [];
+                let segStart = startElapsed;
+                let owned = true;
+                for (const ev of evs) {
+                    const evElapsed = dateToElapsedYears(ev.date, baseYear);
+                    if (ev.type === 'LOST' && owned) {
+                        segments.push([segStart, Math.max(segStart, evElapsed)]);
+                        owned = false;
+                    } else if ((ev.type === 'TAKEN' || ev.type === 'COLONIZED') && !owned) {
+                        segStart = evElapsed;
+                        owned = true;
+                    }
+                }
+                if (owned) {
+                    segments.push([segStart, Math.max(segStart, currentElapsed)]);
+                }
+
+                planetEntries.push({
+                    planetId,
+                    name: pObj.name || `Planet ${planetId}`,
+                    startElapsed,
+                    segments,
+                    events: evs
+                });
+            }
+
+            planetEntries.sort((a, b) => a.startElapsed - b.startElapsed || a.name.localeCompare(b.name));
+
+            if (planetEntries.length === 0 && !rowsHtml) {
+                stage.style.width = '100%';
+                stage.innerHTML = `<div style="padding:24px; color:#888;">No planetary builds recorded up to ${currentDate}.</div>`;
+                return;
+            }
+
+            for (const p of planetEntries) {
+                const startX = leftPad + p.startElapsed * vtZoom;
+                const labelLeft = Math.max(4, startX - 138);
+
+                const barsHtml = p.segments.map(([s0, s1]) => {
+                    const bx = leftPad + s0 * vtZoom;
+                    const bw = Math.max(4, (s1 - s0) * vtZoom);
+                    return `<div class="vt-bar" style="left:${bx}px; width:${bw}px;"></div>`;
+                }).join('');
+
+                const byDate = new Map();
+                p.events.forEach(ev => {
+                    if (!byDate.has(ev.date)) byDate.set(ev.date, []);
+                    byDate.get(ev.date).push(ev);
+                });
+
+                const nodesHtml = renderRowNodes(byDate, p.planetId, p.name, 'planet', baseYear, leftPad);
+
+                rowsHtml += `
+                    <div class="vt-row">
+                        <div class="vt-planet-label" style="left:${labelLeft}px;" title="${escapeHtml(p.name)} (Started Yr ${p.startElapsed.toFixed(1)})">${escapeHtml(p.name)}</div>
+                        ${barsHtml}
+                        ${nodesHtml}
+                    </div>
+                `;
+            }
+
+            stage.style.width = `${totalWidth}px`;
+            stage.innerHTML = `
+                <div class="vt-axis-header">${axisMarksHtml}</div>
+                ${gridlinesHtml}
+                ${nowLineHtml}
+                <div class="vt-rows">${rowsHtml}</div>
+            `;
+            hydrateDdsImages(stage);
+
+            if (preserveScroll) {
+                scrollWrap.scrollLeft = prevLeft;
+                scrollWrap.scrollTop = prevTop;
+            }
+        }
+
+        // Delegated tooltip & click handlers for Build Timeline icon nodes
+        (() => {
+            const stage = document.getElementById('vt-stage');
+            const tooltip = document.getElementById('vt-tooltip');
+            const detailBar = document.getElementById('vt-detail-bar');
+
+            function positionTooltip(e) {
+                const pad = 14;
+                const tw = tooltip.offsetWidth || 280;
+                const th = tooltip.offsetHeight || 90;
+                const left = Math.min(e.clientX + pad, window.innerWidth - tw - 12);
+                const top = Math.min(e.clientY + pad, window.innerHeight - th - 12);
+                tooltip.style.left = `${Math.max(8, left)}px`;
+                tooltip.style.top = `${Math.max(8, top)}px`;
+            }
+
+            stage.addEventListener('mouseover', e => {
+                const node = e.target.closest('.vt-node');
+                if (!node) return;
+                const info = vtTickRegistry[parseInt(node.dataset.tickIdx, 10)];
+                if (!info) return;
+                tooltip.innerHTML = buildTickDetailHtml(info);
+                hydrateDdsImages(tooltip);
+                tooltip.style.display = 'block';
+                positionTooltip(e);
+            });
+
+            stage.addEventListener('mousemove', e => {
+                if (tooltip.style.display === 'block') {
+                    positionTooltip(e);
+                }
+            });
+
+            stage.addEventListener('mouseout', e => {
+                const node = e.target.closest('.vt-node');
+                if (node) tooltip.style.display = 'none';
+            });
+
+            stage.addEventListener('click', e => {
+                const node = e.target.closest('.vt-node');
+                if (!node) return;
+                const info = vtTickRegistry[parseInt(node.dataset.tickIdx, 10)];
+                if (!info) return;
+                vtSelectedKey = info.key;
+                stage.querySelectorAll('.vt-node.selected').forEach(el => el.classList.remove('selected'));
+                node.classList.add('selected');
+
+                const summaryItems = info.events.map(ev => {
+                    const { text, cls } = formatEventLabel(ev);
+                    const iconPath = resolveEventIcon(ev);
+                    return `<span class="vt-detail-item"><img class="game-icon" data-dds="${iconPath}"><span class="${cls}">${escapeHtml(text)}</span></span>`;
+                }).join(' <span style="color:#555;">&middot;</span> ');
+                const nameColor = getRowColor(info.rowType);
+                detailBar.innerHTML = `
+                    <strong style="color:${nameColor};">${escapeHtml(info.sourceName)}</strong>
+                    <span class="date-badge">[${info.date} · Yr ${info.elapsed.toFixed(1)}]</span>
+                    ${summaryItems}
+                `;
+                hydrateDdsImages(detailBar);
+            });
+        })();
+
+        // --- INTERACTIVE GALAXY & SPAWN MAP ENGINE ---
+        const GalaxySpawnMap = (() => {
+            const canvas = document.getElementById('galaxy-canvas');
+            const ctx = canvas.getContext('2d');
+            let mapData = null;
+            let sysById = new Map();
+            let transform = { scale: 1, x: 0, y: 0 };
+            let isDragging = false;
+            let dragStart = { x: 0, y: 0 };
+            let hoveredSys = null;
+            let selectedSys = null;
+            let initialized = false;
+
+            const ENCLAVE_COLORS = {
+                curators: '#3b82f6',
+                shroudwalker: '#a855f7',
+                artists: '#ec4899',
+                traders: '#22c55e',
+                salvager: '#a16207',
+                mercenary: '#eab308',
+                mindwarden: '#ef4444'
+            };
+
+            const WANDERLUST_META = {
+                ancient_wonders_system: { color: '#00ffff', label: 'Ancient Wonder' },
+                antique_threat_system: { color: '#ffa500', label: 'Antique Threat' },
+                galactic_landmark_system: { color: '#ff00ff', label: 'Galactic Landmark' },
+                natural_spectacle_system: { color: '#32cd32', label: 'Natural Spectacle' },
+                precursor_system: { color: '#14b8a6', label: 'Precursor' },
+                space_ecology_system: { color: '#a3e635', label: 'Space Ecology' }
+            };
+
+            function hasData() {
+                return Boolean(mapData && mapData.systems && mapData.systems.length > 0);
+            }
+
+            function load(data) {
+                if (!data || !data.systems || data.systems.length === 0) return;
+                mapData = data;
+                sysById = new Map(data.systems.map(s => [s.id, s]));
+
+                const hwCount = data.systems.filter(s => s.is_homeworld).length;
+                const conflictCount = (data.conflict_system_ids || []).length;
+                document.getElementById('map-summary-badge').textContent =
+                    `${data.systems.length} stars · ${hwCount} homeworlds · ${conflictCount} spawn conflict(s)`;
+
+                const conflictBox = document.getElementById('map-conflict-summary');
+                if (conflictCount > 0) {
+                    const items = data.conflict_system_ids.map(id => {
+                        const s = sysById.get(id);
+                        return s ? `<li><strong style="color:#ff6b6b;">${s.name}</strong> (#${s.id}): ${(s.claimed_by || []).join(' vs. ')}</li>` : '';
+                    }).join('');
+                    conflictBox.innerHTML = `<div class="map-section-title" style="color:#ff6b6b;">⚠️ Illegal Spawn Collisions (${conflictCount})</div>
+                        <ul style="margin:0; padding-left:18px; font-size:0.82em; color:#ccc;">${items}</ul>`;
+                } else {
+                    conflictBox.innerHTML = `<div class="map-section-title" style="color:#65d788;">✓ Spawn Check Passed</div>
+                        <div style="font-size:0.82em; color:#888;">No 5-jump homeworld collisions after rerouting.</div>`;
+                }
+
+                if (!initialized) {
+                    setupEvents();
+                    initialized = true;
+                }
+            }
+
+            function resizeAndFit() {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                if (!rect.width || !rect.height) return;
+                const dpr = window.devicePixelRatio || 1;
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                fitView();
+            }
+
+            function fitView() {
+                if (!mapData || !mapData.systems.length) return;
+                const rect = canvas.parentElement.getBoundingClientRect();
+                const xs = mapData.systems.map(s => s.x);
+                const ys = mapData.systems.map(s => s.y);
+                const minX = Math.min(...xs), maxX = Math.max(...xs);
+                const minY = Math.min(...ys), maxY = Math.max(...ys);
+                const spanX = Math.max(1, maxX - minX);
+                const spanY = Math.max(1, maxY - minY);
+
+                transform.scale = Math.min(rect.width / spanX, rect.height / spanY) * 0.86;
+                transform.x = rect.width / 2 - ((minX + maxX) / 2) * transform.scale;
+                transform.y = rect.height / 2 - ((minY + maxY) / 2) * transform.scale;
+                draw();
+            }
+
+            function toScreen(sys) {
+                return {
+                    x: sys.x * transform.scale + transform.x,
+                    y: sys.y * transform.scale + transform.y
+                };
+            }
+
+            function drawStar(cx, cy, spikes, outerR, innerR, fillStyle, strokeStyle) {
+                let rot = Math.PI / 2 * 3;
+                let step = Math.PI / spikes;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy - outerR);
+                for (let i = 0; i < spikes; i++) {
+                    ctx.lineTo(cx + Math.cos(rot) * outerR, cy + Math.sin(rot) * outerR);
+                    rot += step;
+                    ctx.lineTo(cx + Math.cos(rot) * innerR, cy + Math.sin(rot) * innerR);
+                    rot += step;
+                }
+                ctx.closePath();
+                ctx.fillStyle = fillStyle;
+                ctx.fill();
+                if (strokeStyle) {
+                    ctx.strokeStyle = strokeStyle;
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+                }
+            }
+
+            function drawPolygon(cx, cy, sides, r, fillStyle, strokeStyle, rotation = 0) {
+                ctx.beginPath();
+                for (let i = 0; i < sides; i++) {
+                    const angle = rotation + (i * 2 * Math.PI) / sides;
+                    const px = cx + r * Math.cos(angle);
+                    const py = cy + r * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.fillStyle = fillStyle;
+                ctx.fill();
+                if (strokeStyle) {
+                    ctx.strokeStyle = strokeStyle;
+                    ctx.lineWidth = 1.2;
+                    ctx.stroke();
+                }
+            }
+
+            function draw() {
+                if (!mapData || !canvas.width) return;
+                const dpr = window.devicePixelRatio || 1;
+                ctx.save();
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                const width = canvas.width / dpr;
+                const height = canvas.height / dpr;
+                ctx.clearRect(0, 0, width, height);
+
+                const showReach = document.getElementById('layer-reach')?.checked;
+                const showConflicts = document.getElementById('layer-conflicts')?.checked;
+                const showHwLabels = document.getElementById('layer-hw-labels')?.checked;
+                const showT1T2 = document.getElementById('layer-t1t2')?.checked;
+                const showEnclaves = document.getElementById('layer-enclaves')?.checked;
+                const showFeMar = document.getElementById('layer-fe-mar')?.checked;
+                const showWanderlust = document.getElementById('layer-wanderlust')?.checked;
+                const showAllNames = document.getElementById('layer-sys-names')?.checked;
+                const searchQuery = (document.getElementById('map-search')?.value || '').trim().toLowerCase();
+
+                ctx.strokeStyle = 'rgba(150, 175, 195, 0.25)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (const [id1, id2] of (mapData.normal_lanes || [])) {
+                    const s1 = sysById.get(id1), s2 = sysById.get(id2);
+                    if (!s1 || !s2) continue;
+                    const p1 = toScreen(s1), p2 = toScreen(s2);
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                }
+                ctx.stroke();
+
+                if (showReach) {
+                    ctx.strokeStyle = 'rgba(101, 215, 136, 0.85)';
+                    ctx.lineWidth = 2.2;
+                    ctx.beginPath();
+                    for (const [id1, id2] of (mapData.reach_lanes || [])) {
+                        const s1 = sysById.get(id1), s2 = sysById.get(id2);
+                        if (!s1 || !s2) continue;
+                        const p1 = toScreen(s1), p2 = toScreen(s2);
+                        ctx.moveTo(p1.x, p1.y);
+                        ctx.lineTo(p2.x, p2.y);
+                    }
+                    ctx.stroke();
+                } else {
+                    ctx.strokeStyle = 'rgba(150, 175, 195, 0.25)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    for (const [id1, id2] of (mapData.reach_lanes || [])) {
+                        const s1 = sysById.get(id1), s2 = sysById.get(id2);
+                        if (!s1 || !s2) continue;
+                        const p1 = toScreen(s1), p2 = toScreen(s2);
+                        ctx.moveTo(p1.x, p1.y);
+                        ctx.lineTo(p2.x, p2.y);
+                    }
+                    ctx.stroke();
+                }
+
+                if (showConflicts && (mapData.conflict_lanes || []).length > 0) {
+                    ctx.strokeStyle = '#ff3b30';
+                    ctx.lineWidth = 2.8;
+                    ctx.beginPath();
+                    for (const [id1, id2] of mapData.conflict_lanes) {
+                        const s1 = sysById.get(id1), s2 = sysById.get(id2);
+                        if (!s1 || !s2) continue;
+                        const p1 = toScreen(s1), p2 = toScreen(s2);
+                        ctx.moveTo(p1.x, p1.y);
+                        ctx.lineTo(p2.x, p2.y);
+                    }
+                    ctx.stroke();
+                }
+
+                for (const sys of mapData.systems) {
+                    const p = toScreen(sys);
+                    if (p.x < -40 || p.x > width + 40 || p.y < -40 || p.y > height + 40) continue;
+
+                    const isSearchMatch = searchQuery && (
+                        sys.name.toLowerCase().includes(searchQuery) ||
+                        (sys.owner && sys.owner.player.toLowerCase().includes(searchQuery)) ||
+                        (sys.owner && sys.owner.empire.toLowerCase().includes(searchQuery))
+                    );
+
+                    if (showConflicts && sys.is_conflict) {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 9, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(255, 59, 48, 0.32)';
+                        ctx.fill();
+                        ctx.strokeStyle = '#ff3b30';
+                        ctx.lineWidth = 1.5;
+                        ctx.stroke();
+                    }
+
+                    if (sys.is_homeworld) {
+                        drawStar(p.x, p.y, 5, 7.5, 3.5, '#ffd700', '#111');
+                    } else if (showFeMar && sys.is_fe) {
+                        drawPolygon(p.x, p.y, 4, 6.5, '#ffffff', '#000', Math.PI / 4);
+                    } else if (showFeMar && sys.is_marauder) {
+                        drawPolygon(p.x, p.y, 6, 6.5, '#ff4081', '#fff', 0);
+                    } else if (showEnclaves && sys.enclave) {
+                        const eColor = ENCLAVE_COLORS[sys.enclave] || '#eab308';
+                        drawPolygon(p.x, p.y, 4, 6.5, eColor, '#fff', 0);
+                    } else if (showWanderlust && sys.wanderlust && sys.wanderlust.length > 0) {
+                        const wColor = WANDERLUST_META[sys.wanderlust[0]]?.color || '#00ffff';
+                        drawPolygon(p.x, p.y, 3, 6.5, wColor, '#fff', -Math.PI / 2);
+                    } else if (showT1T2 && sys.is_t1_t2) {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 3.8, 0, Math.PI * 2);
+                        ctx.fillStyle = '#ff9800';
+                        ctx.fill();
+                    } else {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(0, 229, 255, 0.72)';
+                        ctx.fill();
+                    }
+
+                    if (isSearchMatch || sys === hoveredSys || sys === selectedSys) {
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
+                        ctx.strokeStyle = isSearchMatch ? '#ffd700' : '#4ec9b0';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                    }
+
+                    if (sys.is_homeworld && showHwLabels) {
+                        const label = sys.owner ? sys.owner.player : sys.name;
+                        ctx.font = 'bold 11px "Segoe UI", sans-serif';
+                        ctx.fillStyle = '#fff59d';
+                        ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+                        ctx.lineWidth = 3;
+                        ctx.strokeText(label, p.x + 9, p.y + 4);
+                        ctx.fillText(label, p.x + 9, p.y + 4);
+                    } else if (showAllNames && transform.scale > 1.35) {
+                        ctx.font = '10px "Segoe UI", sans-serif';
+                        ctx.fillStyle = '#b0bec5';
+                        ctx.fillText(sys.name, p.x + 6, p.y + 3);
+                    }
+                }
+
+                ctx.restore();
+            }
+
+            function getSnapshotDataUrl() {
+                if (!canvas.width || !canvas.height) return '';
+                const out = document.createElement('canvas');
+                out.width = canvas.width;
+                out.height = canvas.height;
+                const octx = out.getContext('2d');
+                const grad = octx.createRadialGradient(
+                    out.width / 2, out.height / 2, 10,
+                    out.width / 2, out.height / 2, Math.max(out.width, out.height) * 0.65
+                );
+                grad.addColorStop(0, '#0a1218');
+                grad.addColorStop(1, '#050709');
+                octx.fillStyle = grad;
+                octx.fillRect(0, 0, out.width, out.height);
+                octx.drawImage(canvas, 0, 0);
+                return out.toDataURL('image/png');
+            }
+
+            function updateInspector(sys) {
+                const box = document.getElementById('map-sys-details');
+                if (!sys) {
+                    box.innerHTML = `<span style="color:#888;">Hover or click any star system on the map to inspect its spawn status, hyperlanes, and points of interest.</span>`;
+                    return;
+                }
+                const badges = [];
+                if (sys.is_homeworld) {
+                    const who = sys.owner ? `${sys.owner.player} (${sys.owner.empire})` : 'Homeworld';
+                    badges.push(`<div>🏠 <strong style="color:#ffd700;">Homeworld:</strong> ${who}</div>`);
+                }
+                if (sys.is_t1_t2) badges.push(`<div>🪐 <strong style="color:#ff9800;">Guaranteed Neighbor (T1/T2 Colony)</strong></div>`);
+                if (sys.is_fe) badges.push(`<div>🏛️ <strong style="color:#fff;">Fallen Empire System</strong></div>`);
+                if (sys.is_marauder) badges.push(`<div>🏴‍☠️ <strong style="color:#ff4081;">Marauder System</strong></div>`);
+                if (sys.enclave) badges.push(`<div>🛰️ <strong style="color:#4ec9b0;">Enclave:</strong> ${sys.enclave.toUpperCase()}</div>`);
+                if (sys.wanderlust && sys.wanderlust.length > 0) {
+                    const wLabels = sys.wanderlust.map(w => WANDERLUST_META[w]?.label || w).join(', ');
+                    badges.push(`<div>✨ <strong style="color:#00ffff;">Wanderlust POI:</strong> ${wLabels}</div>`);
+                }
+                if (sys.claimed_by && sys.claimed_by.length > 0) {
+                    const cColor = sys.is_conflict ? '#ff6b6b' : '#65d788';
+                    const cTitle = sys.is_conflict ? '⚠️ Spawn Conflict Claimants' : '5-Jump Reach Claimed By';
+                    badges.push(`<div><strong style="color:${cColor};">${cTitle}:</strong> ${sys.claimed_by.join(', ')}</div>`);
+                }
+
+                box.innerHTML = `
+                    <div style="font-size:1.08em; font-weight:bold; color:#4ec9b0; margin-bottom:4px;">
+                        ${sys.name} <span style="color:#777; font-weight:normal; font-size:0.85em;">(#${sys.id})</span>
+                    </div>
+                    <div style="font-size:0.8em; color:#888; margin-bottom:6px;">Coords: (${sys.x}, ${sys.y})</div>
+                    ${badges.join('') || '<div style="color:#888;">Standard Star System</div>'}
+                `;
+            }
+
+            function findNearestSystem(mx, my) {
+                if (!mapData) return null;
+                let best = null;
+                let bestDist = 14;
+                for (const sys of mapData.systems) {
+                    const p = toScreen(sys);
+                    const d = Math.hypot(p.x - mx, p.y - my);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        best = sys;
+                    }
+                }
+                return best;
+            }
+
+            function setupEvents() {
+                window.addEventListener('resize', () => {
+                    if (document.getElementById('view-map').classList.contains('active')) {
+                        resizeAndFit();
+                    }
+                });
+
+                canvas.addEventListener('wheel', e => {
+                    e.preventDefault();
+                    const rect = canvas.getBoundingClientRect();
+                    const mx = e.clientX - rect.left;
+                    const my = e.clientY - rect.top;
+                    const zoomFactor = e.deltaY < 0 ? 1.18 : 0.85;
+                    const newScale = Math.max(0.25, Math.min(18, transform.scale * zoomFactor));
+                    transform.x = mx - (mx - transform.x) * (newScale / transform.scale);
+                    transform.y = my - (my - transform.y) * (newScale / transform.scale);
+                    transform.scale = newScale;
+                    draw();
+                }, { passive: false });
+
+                canvas.addEventListener('mousedown', e => {
+                    isDragging = true;
+                    dragStart = { x: e.clientX - transform.x, y: e.clientY - transform.y };
+                });
+
+                window.addEventListener('mouseup', () => { isDragging = false; });
+
+                canvas.addEventListener('mousemove', e => {
+                    const rect = canvas.getBoundingClientRect();
+                    const mx = e.clientX - rect.left;
+                    const my = e.clientY - rect.top;
+                    if (isDragging) {
+                        transform.x = e.clientX - dragStart.x;
+                        transform.y = e.clientY - dragStart.y;
+                        draw();
+                        return;
+                    }
+                    const hit = findNearestSystem(mx, my);
+                    if (hit !== hoveredSys) {
+                        hoveredSys = hit;
+                        updateInspector(hoveredSys || selectedSys);
+                        draw();
+                    }
+                });
+
+                canvas.addEventListener('click', e => {
+                    const rect = canvas.getBoundingClientRect();
+                    const hit = findNearestSystem(e.clientX - rect.left, e.clientY - rect.top);
+                    selectedSys = hit;
+                    updateInspector(selectedSys || hoveredSys);
+                    draw();
+                });
+            }
+
+            return { hasData, load, draw, fitView, resizeAndFit, getSnapshotDataUrl };
+        })();
+
+        // --- PRINT / PDF & STANDALONE OFFLINE HTML EXPORT ---
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function downloadMapPng() {
+            const dataUrl = GalaxySpawnMap.getSnapshotDataUrl();
+            if (!dataUrl) {
+                alert("Galaxy map is not loaded yet.");
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = `${safeFilenamePart(timelineData?.campaign_name || 'Stellaris')}_galaxy_map.png`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        async function printCurrentView() {
+            if (!timelineData) return;
+            const activeMain = document.querySelector('.main-view.active');
+            if (activeMain && activeMain.id === 'view-map') {
+                const img = document.getElementById('map-print-img');
+                img.src = GalaxySpawnMap.getSnapshotDataUrl();
+            } else {
+                await ensureDdsHydrated(activeMain);
+            }
+            window.print();
+        }
+
+        async function exportCurrentViewHtml() {
+            if (!timelineData) return;
+            const exportBtn = document.getElementById('btn-export-html');
+            const origLabel = exportBtn.textContent;
+            exportBtn.textContent = '⏳ Packaging...';
+            exportBtn.disabled = true;
+
+            try {
+                const activeMain = document.querySelector('.main-view.active');
+                const currentDate = globalDates[parseInt(document.getElementById('timeline-slider').value, 10)] || '';
+                const campName = timelineData.campaign_name || 'Stellaris';
+                const styles = document.querySelector('head style').innerHTML;
+
+                let pageTitle = `${campName} — ${currentDate}`;
+                let outFileName = `${safeFilenamePart(campName)}_${safeFilenamePart(currentDate)}.html`;
+                let bodyHtml = '';
+                let extraScript = '';
+
+                if (activeMain.id === 'view-empire') {
+                    const pid = document.getElementById('player-select').value;
+                    const player = timelineData.players[pid];
+                    const activeSub = document.querySelector('.tab-content.active');
+                    const activeSubBtn = document.querySelector('.tab-btn.active');
+                    const subLabel = activeSubBtn ? activeSubBtn.textContent.trim() : 'Inspector';
+
+                    await ensureDdsHydrated(document.getElementById('view-empire'));
+
+                    // Clone Empire Profile and remove the live dropdown
+                    const profileClone = document.getElementById('empire-profile-panel').cloneNode(true);
+                    const sel = profileClone.querySelector('#player-select');
+                    if (sel) sel.remove();
+                    profileClone.querySelectorAll('img[data-dds]').forEach(img => img.removeAttribute('data-dds'));
+
+                    // Clone active Sub-Tab
+                    const subClone = activeSub.cloneNode(true);
+                    subClone.querySelectorAll('img[data-dds]').forEach(img => img.removeAttribute('data-dds'));
+
+                    const playerLabel = player.empire_name && player.empire_name !== player.name
+                        ? `${player.name} (${player.empire_name})`
+                        : player.name;
+
+                    pageTitle = `${campName} — ${playerLabel} — ${subLabel} (${currentDate})`;
+                    outFileName = `${safeFilenamePart(campName)}_${safeFilenamePart(player.name)}_${safeFilenamePart(subLabel)}_${safeFilenamePart(currentDate)}.html`;
+
+                    // If exporting the Build Timeline, pre-cache every tooltip icon as base64 and embed interactive hover/click JS
+                    if (activeSub.id === 'tab-visual-timeline') {
+                        const iconPaths = new Set();
+                        vtTickRegistry.forEach(info => {
+                            info.events.forEach(ev => iconPaths.add(resolveEventIcon(ev)));
+                        });
+                        await Promise.all(Array.from(iconPaths).map(p => loadDdsUrl(p).catch(() => '')));
+
+                        const offlineRegistry = vtTickRegistry.map(info => ({
+                            key: info.key,
+                            sourceName: info.sourceName,
+                            date: info.date,
+                            elapsed: info.elapsed,
+                            rowType: info.rowType,
+                            events: info.events.map(ev => {
+                                const { text, cls } = formatEventLabel(ev);
+                                const ip = resolveEventIcon(ev);
+                                return { text, cls, src: ddsUrlCache.get(ip) || '' };
+                            })
+                        }));
+
+                        const safeJson = JSON.stringify(offlineRegistry).replace(/<\/script>/gi, '<\\/script>');
+                        extraScript = `
+                        <div id="vt-tooltip" class="vt-tooltip"></div>
+                        <script>
+                            const vtTickRegistry = ${safeJson};
+                            function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+                            function rowColor(t){if(t==='empire')return'#c586c0';if(t==='physics')return'#6cb6ff';if(t==='society')return'#6ad48b';if(t==='engineering')return'#f2a65a';return'#f46a6a';}
+                            function tipHtml(info){
+                                const hCls = info.rowType && info.rowType !== 'planet' ? 'vt-tooltip-head ' + info.rowType : 'vt-tooltip-head';
+                                const items = info.events.map(ev => '<li>' + (ev.src ? '<img class="game-icon" src="'+ev.src+'">' : '') + '<span class="'+ev.cls+'">'+esc(ev.text)+'</span></li>').join('');
+                                return '<div class="'+hCls+'"><span>'+esc(info.sourceName)+'</span><span class="vt-tooltip-date">Yr '+info.elapsed.toFixed(1)+' ('+info.date+')</span></div><ul>'+items+'</ul>';
+                            }
+                            const stage = document.getElementById('vt-stage');
+                            const tooltip = document.getElementById('vt-tooltip');
+                            const detailBar = document.getElementById('vt-detail-bar');
+                            function posTip(e){
+                                const left = Math.min(e.clientX + 14, window.innerWidth - (tooltip.offsetWidth||280) - 12);
+                                const top = Math.min(e.clientY + 14, window.innerHeight - (tooltip.offsetHeight||90) - 12);
+                                tooltip.style.left = Math.max(8, left) + 'px';
+                                tooltip.style.top = Math.max(8, top) + 'px';
+                            }
+                            stage.addEventListener('mouseover', e => {
+                                const node = e.target.closest('.vt-node');
+                                if (!node) return;
+                                const info = vtTickRegistry[parseInt(node.dataset.tickIdx, 10)];
+                                if (!info) return;
+                                tooltip.innerHTML = tipHtml(info);
+                                tooltip.style.display = 'block';
+                                posTip(e);
+                            });
+                            stage.addEventListener('mousemove', e => { if (tooltip.style.display === 'block') posTip(e); });
+                            stage.addEventListener('mouseout', e => { if (e.target.closest('.vt-node')) tooltip.style.display = 'none'; });
+                            stage.addEventListener('click', e => {
+                                const node = e.target.closest('.vt-node');
+                                if (!node) return;
+                                const info = vtTickRegistry[parseInt(node.dataset.tickIdx, 10)];
+                                if (!info) return;
+                                stage.querySelectorAll('.vt-node.selected').forEach(el => el.classList.remove('selected'));
+                                node.classList.add('selected');
+                                const items = info.events.map(ev => '<span class="vt-detail-item">'+(ev.src ? '<img class="game-icon" src="'+ev.src+'">' : '')+'<span class="'+ev.cls+'">'+esc(ev.text)+'</span></span>').join(' <span style="color:#555;">&middot;</span> ');
+                                detailBar.innerHTML = '<strong style="color:'+rowColor(info.rowType)+';">'+esc(info.sourceName)+'</strong> <span class="date-badge">['+info.date+' · Yr '+info.elapsed.toFixed(1)+']</span> ' + items;
+                            });
+                        <\/script>`;
+                    } else if (activeSub.id === 'tab-fleets') {
+                        extraScript = `<script>function toggleFleet(h){const b=h.parentElement.querySelector('.fleet-body');if(b)b.classList.toggle('open');}<\/script>`;
+                    }
+
+                    bodyHtml = `
+                        <h1><span>${escapeHtml(campName)} — ${escapeHtml(playerLabel)}</span><span style="font-size:0.65em; color:#4ec9b0;">${escapeHtml(subLabel)} · ${escapeHtml(currentDate)}</span></h1>
+                        <div style="display:flex; flex-direction:column; gap:18px;">
+                            <div class="panel" style="overflow:visible;">${profileClone.innerHTML}</div>
+                            <div class="panel" style="overflow:visible;">
+                                <h2 style="margin:0 0 12px 0; color:#4ec9b0; border-bottom:1px solid #444; padding-bottom:8px;">${escapeHtml(subLabel)}</h2>
+                                ${subClone.innerHTML}
+                            </div>
+                        </div>
+                    `;
+                } else if (activeMain.id === 'view-leaderboard') {
+                    await ensureDdsHydrated(document.getElementById('view-leaderboard'));
+                    const tableClone = document.getElementById('lb-table').cloneNode(true);
+                    tableClone.querySelectorAll('img[data-dds]').forEach(img => img.removeAttribute('data-dds'));
+                    tableClone.querySelectorAll('[onclick]').forEach(el => el.removeAttribute('onclick'));
+
+                    pageTitle = `${campName} — Leaderboard (${currentDate})`;
+                    outFileName = `${safeFilenamePart(campName)}_Leaderboard_${safeFilenamePart(currentDate)}.html`;
+
+                    bodyHtml = `
+                        <h1><span>${escapeHtml(campName)} — Galactic Standings</span><span style="font-size:0.65em; color:#4ec9b0;">Date: ${escapeHtml(currentDate)}</span></h1>
+                        <div class="leaderboard-panel" style="max-height:none; overflow:visible;">
+                            ${tableClone.outerHTML}
+                        </div>
+                    `;
+                } else if (activeMain.id === 'view-map') {
+                    const mapPng = GalaxySpawnMap.getSnapshotDataUrl();
+                    const legendHtml = document.getElementById('map-legend-block').innerHTML;
+                    const conflictHtml = document.getElementById('map-conflict-summary').innerHTML;
+                    const summaryText = document.getElementById('map-summary-badge').textContent;
+
+                    pageTitle = `${campName} — Galaxy & Spawn Map`;
+                    outFileName = `${safeFilenamePart(campName)}_Galaxy_Map.html`;
+
+                    bodyHtml = `
+                        <h1><span>${escapeHtml(campName)} — Galaxy &amp; Spawn Map</span><span style="font-size:0.6em; color:#aaa;">${escapeHtml(summaryText)}</span></h1>
+                        <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
+                            <div style="flex:1; min-width:520px;">
+                                <img src="${mapPng}" style="width:100%; height:auto; display:block; border-radius:6px; border:1px solid #333;">
+                            </div>
+                            <div class="map-sidebar" style="max-height:none; overflow:visible;">
+                                <div>${legendHtml}</div>
+                                <div>${conflictHtml}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                const standaloneHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${escapeHtml(pageTitle)}</title>
+<style>
+${styles}
+body { padding: 24px 30px; }
+.tab-content { display: block !important; overflow: visible !important; }
+.vt-scroll-wrap { max-height: 75vh; }
+</style>
+</head>
+<body>
+${bodyHtml}
+<div style="margin-top:16px; font-size:0.78em; color:#666; text-align:right;">Exported from Stellaris Timeline Inspector (Offline Snapshot)</div>
+${extraScript}
+</body>
+</html>`;
+
+                downloadBlob(new Blob([standaloneHtml], { type: 'text/html;charset=utf-8' }), outFileName);
+            } finally {
+                exportBtn.textContent = origLabel;
+                exportBtn.disabled = false;
+            }
         }
 
         function fetchTimelines() {
@@ -528,7 +1851,6 @@
         
         fetchTimelines();
 
-        // Background Poller: checks every 4 seconds for new timelines or live save updates
         setInterval(async () => {
             if (!currentFilename) {
                 fetchTimelines();
@@ -571,7 +1893,7 @@
 
             document.getElementById('landing').style.display = 'none';
             document.getElementById('dashboard-view').style.display = 'flex';
-            document.getElementById('btn-back').style.display = 'block';
+            document.getElementById('header-actions').style.display = 'flex';
 
             fetch(`/api/meta?file=${encodeURIComponent(filename)}`)
                 .then(r => r.json())
@@ -586,6 +1908,10 @@
                 .then(data => {
                     timelineData = data;
                     document.title = `${data.campaign_name} - Timeline Inspector`;
+                    document.getElementById('app-title').textContent = `${data.campaign_name} — Timeline Inspector`;
+                    if (data.galaxy_map) {
+                        GalaxySpawnMap.load(data.galaxy_map);
+                    }
                     initializeDashboard();
                     hydrateDdsImages();
                 })
@@ -599,8 +1925,10 @@
             const prevDate = globalDates[parseInt(slider.value)];
 
             timelineData = newData;
+            if (newData.galaxy_map && !GalaxySpawnMap.hasData()) {
+                GalaxySpawnMap.load(newData.galaxy_map);
+            }
 
-            // Rebuild player dropdown without losing current selection
             playerSelect.innerHTML = "";
             const dateSet = new Set();
             for (const pid in timelineData.players) {
@@ -630,7 +1958,11 @@
             document.querySelectorAll('.main-nav-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(viewId).classList.add('active');
             btn.classList.add('active');
-            updateView(true);
+            if (viewId === 'view-map') {
+                requestAnimationFrame(() => GalaxySpawnMap.resizeAndFit());
+            } else {
+                updateView(true);
+            }
         }
 
         function jumpToPlayer(pid) {
@@ -644,7 +1976,11 @@
             document.getElementById(tabId).classList.add('active');
             btn.classList.add('active');
             document.getElementById('feed-filters').style.display = (tabId === 'tab-builds') ? 'flex' : 'none';
+            document.getElementById('visual-timeline-controls').style.display = (tabId === 'tab-visual-timeline') ? 'flex' : 'none';
             document.getElementById('tech-filters').style.display = (tabId === 'tab-techs') ? 'flex' : 'none';
+            if (tabId === 'tab-visual-timeline' && timelineData) {
+                updateView(true);
+            }
         }
 
         function setFeedFilter(mode, btn) {
@@ -708,7 +2044,6 @@
             slider.value = Math.max(0, globalDates.length - 1);
 
             slider.addEventListener('input', () => {
-                // If user manually scrubs backward, pause auto-follow so we don't yank them away on next autosave
                 const isAtLatest = parseInt(slider.value) >= globalDates.length - 1;
                 if (!isAtLatest && liveFollowEnabled) {
                     liveFollowEnabled = false;
@@ -721,7 +2056,12 @@
                 }
                 updateView(false);
             });
-            playerSelect.addEventListener('change', () => updateView(false));
+            playerSelect.addEventListener('change', () => {
+                vtSelectedKey = null;
+                document.getElementById('vt-detail-bar').innerHTML =
+                    `<span style="color:#888;">Hover over any icon to inspect builds or techs, or click an icon to pin its details here.</span>`;
+                updateView(false);
+            });
 
             updateView(false);
         }
@@ -1018,7 +2358,12 @@
             resContainer.innerHTML = resHtml;
             hydrateDdsImages(resContainer);
 
-            // Sub-Tab 3: Military Fleets (Preserves open/closed state and scroll position)
+            // Sub-Tab: Visual Build Timeline
+            if (document.getElementById('tab-visual-timeline').classList.contains('active')) {
+                renderVisualTimeline(player, currentDate, preserveScroll);
+            }
+
+            // Sub-Tab: Military Fleets
             const fleetTab = document.getElementById('tab-fleets');
             const prevFleetScroll = fleetTab.scrollTop;
             const fleetFeed = document.getElementById('fleet-feed');
@@ -1057,7 +2402,7 @@
                 fleetFeed.innerHTML = "<p style='color:#888;'>No military fleets found.</p>";
             }
 
-            // Sub-Tab 2: Tech Research Feed
+            // Sub-Tab: Tech Research Feed
             const techTab = document.getElementById('tab-techs');
             const prevTechScroll = techTab.scrollTop;
             const wasTechAtBottom = (techTab.scrollHeight - techTab.scrollTop - techTab.clientHeight) < 40;
@@ -1091,12 +2436,11 @@
                 techFeed.innerHTML = "<li style='color:#888;'>No researched technologies matching filter up to this date.</li>";
             }
 
-            // Sub-Tab 1: Unified Timeline Feed
+            // Sub-Tab: Unified Timeline Feed
             const buildTab = document.getElementById('tab-builds');
             const prevBuildScroll = buildTab.scrollTop;
             const wasBuildAtBottom = (buildTab.scrollHeight - buildTab.scrollTop - buildTab.clientHeight) < 40;
             const buildFeed = document.getElementById('build-feed');
-            buildFeed.innerHTML = "";
             let timelineEvents = [];
             
             if (feedFilter === 'ALL' || feedFilter === 'PLANET') {
@@ -1125,24 +2469,17 @@
                 });
             }
 
-            timelineEvents.sort((a, b) => a.date.localeCompare(b.date)).forEach(ev => {
-                let textClass = 'item-build';
-                let actionText = `Built: ${ev.item}`;
-                let badgeClass = ev.category === 'EMPIRE' ? 'src-badge empire' : 'src-badge';
+            buildFeed.innerHTML = timelineEvents
+                .sort((a, b) => a.date.localeCompare(b.date))
+                .map(ev => {
+                    const { text: actionText, cls: textClass } = formatEventLabel(ev);
+                    const badgeClass = ev.category === 'EMPIRE' ? 'src-badge empire' : 'src-badge';
+                    const iconPath = resolveEventIcon(ev);
+                    return `<li><span class="date-badge">[${ev.date}]</span> <span class="${badgeClass}">${escapeHtml(ev.sourceLabel)}</span> &rarr; <img class="game-icon" data-dds="${iconPath}"> <span class="${textClass}">${escapeHtml(actionText)}</span></li>`;
+                })
+                .join('');
 
-                if (ev.type === "COLONIZED") { actionText = "Colonized / Settled"; textClass = 'item-conquest'; }
-                else if (ev.type === "TAKEN") { actionText = `Conquered from ${ev.item}`; textClass = 'item-conquest'; }
-                else if (ev.type === "LOST") { actionText = `Lost to ${ev.item}`; textClass = 'item-loss'; }
-                else if (ev.type === "TRADITION") { actionText = `Tradition: ${ev.item}`; textClass = 'item-tradition'; }
-                else if (ev.type === "ASCENSION_PERK") { actionText = `Ascension Perk: ${ev.item}`; textClass = 'item-perk'; }
-                else if (ev.type === "AGENDA_SELECTED") { actionText = `Agenda Selected: ${ev.item}`; textClass = 'item-agenda'; }
-                else if (ev.type === "AGENDA_LAUNCHED") { actionText = `Agenda Launched: ${ev.item}`; textClass = 'item-agenda'; }
-                else if (ev.type === "CIVICS_CHANGED") { actionText = `Civics Reformed: ${ev.item}`; textClass = 'item-gov'; }
-                else if (ev.type === "ETHICS_CHANGED") { actionText = `Ethics Shifted: ${ev.item}`; textClass = 'item-gov'; }
-                else if (ev.type === "GOV_CHANGED") { actionText = `Government Reformed: ${ev.item}`; textClass = 'item-gov'; }
-
-                buildFeed.innerHTML += `<li><span class="date-badge">[${ev.date}]</span> <span class="${badgeClass}">${ev.sourceLabel}</span> &rarr; <span class="${textClass}">${actionText}</span></li>`;
-            });
+            hydrateDdsImages(buildFeed);
             buildTab.scrollTop = (preserveScroll && !wasBuildAtBottom) ? prevBuildScroll : buildTab.scrollHeight;
         }
     </script>

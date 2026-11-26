@@ -27,6 +27,18 @@ NON_MILITARY_SIZES = {
     'mining_station', 'research_station', 'observation_station',
     'military_station_small', 'military_station_medium', 'military_station_large'
 }
+ENCLAVE_TYPES = (
+    "curators", "shroudwalker", "artists", "traders",
+    "salvager", "mercenary", "mindwarden"
+)
+WANDERLUST_FLAG_LABELS = {
+    "ancient_wonders_system": "Ancient Wonder",
+    "antique_threat_system": "Antique Threat",
+    "galactic_landmark_system": "Galactic Landmark",
+    "natural_spectacle_system": "Natural Spectacle",
+    "precursor_system": "Precursor",
+    "space_ecology_system": "Space Ecology"
+}
 
 # Worker-level globals (initialized once per CPU core)
 WORKER_LOC_DICT = {}
@@ -54,6 +66,25 @@ def extract_block(text, start_index):
             depth -= 1
             pos = next_close + 1
     return text[start_index:pos]
+
+
+def strip_nested_blocks(blk):
+    """Returns only the top-level content inside a { ... } block so nested sub-blocks don't shadow top-level icon= properties."""
+    if not blk or len(blk) < 2:
+        return ""
+    out = []
+    depth = 0
+    for ch in blk:
+        if ch == '{':
+            depth += 1
+            if depth == 1:
+                continue
+        elif ch == '}':
+            depth -= 1
+            continue
+        if depth == 1:
+            out.append(ch)
+    return "".join(out)
 
 
 def get_top_level_blocks(container_text):
@@ -122,15 +153,17 @@ def load_stellaris_localization(game_folder):
 def build_game_catalog(game_folder):
     """
     Indexes .dds icons (prioritizing core gameplay folders over achievements)
-    and parses interface/*.gfx, component_templates, traits, civics, origins, ethics, and technologies.
+    and parses interface/*.gfx, component_templates, buildings, districts, zones,
+    traditions, ascension perks, council agendas, traits, civics, origins, ethics, and technologies.
     """
     dds_by_stem = {}
+    dds_by_folder = defaultdict(dict)
     icons_root = os.path.join(game_folder, "gfx", "interface", "icons")
 
-    # Index high-priority gameplay icon folders first so achievements never shadow them
     priority_subfolders = [
-        "technologies", "ship_parts", "traits", "governments",
-        "origins", "ethics", "resources", "agenda_icons", "traditions", "ascension_perks"
+        "buildings", "districts", "zones", "traditions", "ascension_perks",
+        "agenda_icons", "technologies", "ship_parts", "traits", "governments",
+        "origins", "ethics", "resources"
     ]
     for sub in priority_subfolders:
         sub_path = os.path.join(icons_root, sub)
@@ -140,6 +173,8 @@ def build_game_catalog(game_folder):
                     if f.lower().endswith(".dds"):
                         stem = os.path.splitext(f)[0].lower()
                         rel = "/" + os.path.relpath(os.path.join(root, f), game_folder).replace("\\", "/")
+                        if stem not in dds_by_folder[sub]:
+                            dds_by_folder[sub][stem] = rel
                         if stem not in dds_by_stem:
                             dds_by_stem[stem] = rel
 
@@ -174,7 +209,17 @@ def build_game_catalog(game_folder):
                     except Exception:
                         pass
 
-    def resolve_icon_ref(ref_str, fallback_stem=None):
+    def resolve_icon_ref(ref_str, fallback_stem=None, preferred_folder=None):
+        folder_map = dds_by_folder.get(preferred_folder, {}) if preferred_folder else {}
+
+        def lookup_stem(s):
+            sl = s.lower()
+            if sl in folder_map:
+                return folder_map[sl]
+            if sl in dds_by_stem:
+                return dds_by_stem[sl]
+            return ""
+
         if ref_str:
             ref_str = ref_str.strip().strip('"')
             if ref_str in gfx_map:
@@ -184,17 +229,27 @@ def build_game_catalog(game_folder):
             if ref_str.lower().endswith(".dds"):
                 return "/" + ref_str.replace("\\", "/").lstrip("/")
             if ref_str.startswith("GFX_"):
-                stem = ref_str[4:].lower()
-                if stem in dds_by_stem:
-                    return dds_by_stem[stem]
-            if ref_str.lower() in dds_by_stem:
-                return dds_by_stem[ref_str.lower()]
+                found = lookup_stem(ref_str[4:])
+                if found:
+                    return found
+            found = lookup_stem(ref_str)
+            if found:
+                return found
+
         if fallback_stem:
-            fb_low = fallback_stem.lower()
-            if fb_low in dds_by_stem:
-                return dds_by_stem[fb_low]
+            found = lookup_stem(fallback_stem)
+            if found:
+                return found
             if f"GFX_{fallback_stem}" in gfx_map:
                 return gfx_map[f"GFX_{fallback_stem}"]
+            base_stem = re.sub(r'_\d+$', '', fallback_stem)
+            if base_stem != fallback_stem:
+                found = lookup_stem(base_stem)
+                if found:
+                    return found
+                found = lookup_stem(f"{base_stem}_1")
+                if found:
+                    return found
         return ""
 
     # 2. Parse component_sets & component_templates for ship part icons
@@ -220,7 +275,7 @@ def build_game_catalog(game_folder):
                         if not k_m:
                             continue
                         comp_key = k_m.group(1)
-                        icon_path = resolve_icon_ref(ic_m.group(1) if ic_m else "", comp_key)
+                        icon_path = resolve_icon_ref(ic_m.group(1) if ic_m else "", comp_key, "ship_parts")
                         if icon_path:
                             comp_icons[comp_key] = icon_path
                             stripped = re.sub(
@@ -234,14 +289,29 @@ def build_game_catalog(game_folder):
                 except Exception:
                     pass
 
-    # 3. Parse traits, civics, origins, and ethics
+    # 3. Seed entity_icons directly from core icon folders, then apply explicit .txt overrides
     entity_icons = {}
+    for folder_name in (
+        "buildings", "districts", "zones", "traditions", "ascension_perks",
+        "agenda_icons", "origins", "governments", "ethics", "traits"
+    ):
+        for stem, rel_path in dds_by_folder.get(folder_name, {}).items():
+            if stem not in entity_icons:
+                entity_icons[stem] = rel_path
+
     entity_dirs = [
-        os.path.join(game_folder, "common", "traits"),
-        os.path.join(game_folder, "common", "governments", "civics"),
-        os.path.join(game_folder, "common", "ethics")
+        ("traits", os.path.join(game_folder, "common", "traits")),
+        ("governments", os.path.join(game_folder, "common", "governments", "civics")),
+        ("ethics", os.path.join(game_folder, "common", "ethics")),
+        ("buildings", os.path.join(game_folder, "common", "buildings")),
+        ("districts", os.path.join(game_folder, "common", "districts")),
+        ("zones", os.path.join(game_folder, "common", "zones")),
+        ("traditions", os.path.join(game_folder, "common", "traditions")),
+        ("traditions", os.path.join(game_folder, "common", "tradition_categories")),
+        ("ascension_perks", os.path.join(game_folder, "common", "ascension_perks")),
+        ("agenda_icons", os.path.join(game_folder, "common", "council_agendas")),
     ]
-    for edir in entity_dirs:
+    for pref_folder, edir in entity_dirs:
         if not os.path.exists(edir):
             continue
         for root, _, files in os.walk(edir):
@@ -254,17 +324,37 @@ def build_game_catalog(game_folder):
                     for key, blk in get_named_blocks(content):
                         if key.startswith("@"):
                             continue
-                        ic_m = re.search(r'\bicon\s*=\s*"?([^"\s\}]+)"?', blk)
-                        pic_m = re.search(r'\bpicture\s*=\s*"?([^"\s\}]+)"?', blk)
+                        top_blk = strip_nested_blocks(blk)
+                        ic_m = re.search(r'\bicon\s*=\s*"?([^"\s\}]+)"?', top_blk) or re.search(r'\bicon\s*=\s*"?([^"\s\}]+)"?', blk)
+                        pic_m = re.search(r'\bpicture\s*=\s*"?([^"\s\}]+)"?', top_blk)
                         raw_ref = ic_m.group(1) if ic_m else (pic_m.group(1) if pic_m else "")
-                        icon_path = resolve_icon_ref(raw_ref, key)
+
+                        icon_path = resolve_icon_ref(raw_ref, key, pref_folder)
                         if not icon_path and key.startswith("origin_"):
-                            alt_key = key.replace("origin_", "origins_", 1)
-                            icon_path = resolve_icon_ref("", alt_key)
+                            icon_path = resolve_icon_ref("", key.replace("origin_", "origins_", 1), "origins")
+                        if not icon_path and key.startswith("tradition_"):
+                            icon_path = resolve_icon_ref("", key.replace("tradition_", "tradition_icon_", 1), "traditions")
+
                         if icon_path:
                             entity_icons[key] = icon_path
+
+                        # Link tradition_categories adopt/finish keys to the tree's icon
+                        if pref_folder == "traditions" and key.startswith("tradition_") and icon_path:
+                            for bonus_prop in ("adoption_bonus", "finish_bonus"):
+                                bm = re.search(rf'\b{bonus_prop}\s*=\s*"?([^"\s\}}]+)"?', top_blk)
+                                if bm and bm.group(1) not in entity_icons:
+                                    entity_icons[bm.group(1)] = icon_path
                 except Exception:
                     pass
+
+    # Map tradition_icon_<tree> files to tr_<tree>_adopt / tr_<tree>_finish fallbacks
+    for stem, rel_path in dds_by_folder.get("traditions", {}).items():
+        if stem.startswith("tradition_icon_"):
+            tree = stem[len("tradition_icon_"):]
+            for suffix in ("adopt", "finish"):
+                tr_key = f"tr_{tree}_{suffix}"
+                if tr_key not in entity_icons:
+                    entity_icons[tr_key] = rel_path
 
     # 4. Parse technologies (area, tier, icon with area fallback)
     area_fallback_icons = {
@@ -290,7 +380,7 @@ def build_game_catalog(game_folder):
                         ic_m = re.search(r'\bicon\s*=\s*"?([^"\s\}]+)"?', blk)
                         area = area_m.group(1).lower() if area_m else "physics"
                         tier = int(tier_m.group(1)) if tier_m else 1
-                        icon_path = resolve_icon_ref(ic_m.group(1) if ic_m else "", key)
+                        icon_path = resolve_icon_ref(ic_m.group(1) if ic_m else "", key, "technologies")
                         if not icon_path:
                             icon_path = area_fallback_icons.get(area, "/gfx/interface/icons/research_icon.dds")
                         tech_catalog[key] = {
@@ -302,6 +392,20 @@ def build_game_catalog(game_folder):
                     pass
 
     return comp_icons, entity_icons, tech_catalog
+
+
+def build_ui_icon_map(entity_icons, loc_dict):
+    """Builds the JSON icon lookup table indexed by raw internal key and localized display name."""
+    ui_icon_map = {}
+    for raw_key, dds_path in entity_icons.items():
+        ui_icon_map[raw_key] = dds_path
+        low_key = raw_key.lower()
+        if low_key not in ui_icon_map:
+            ui_icon_map[low_key] = dds_path
+        clean_name = clean_loc(raw_key, loc_dict)
+        if clean_name and clean_name not in ui_icon_map:
+            ui_icon_map[clean_name] = dds_path
+    return ui_icon_map
 
 
 def resolve_loc_references(text, loc_dict, depth=0):
@@ -341,7 +445,7 @@ def clean_loc(key, loc_dict):
         return re.sub(r'§[A-Za-z!]', '', resolved).strip()
 
     cleaned = key
-    for prefix in ('trait_', 'civic_', 'origin_', 'ethic_', 'building_', 'district_', 'agenda_', 'tr_', 'tradition_', 'ap_', 'gov_', 'auth_', 'tech_'):
+    for prefix in ('trait_', 'civic_', 'origin_', 'ethic_', 'building_', 'district_', 'zone_', 'agenda_', 'tr_', 'tradition_', 'ap_', 'gov_', 'auth_', 'tech_'):
         if cleaned.startswith(prefix):
             cleaned = cleaned[len(prefix):]
             break
@@ -381,27 +485,66 @@ def extract_gamestate_content(file_or_dir_path):
         return f.read()
 
 
-def resolve_saved_name(block_text, loc_dict, default="Unknown"):
+def resolve_name_node(node_blk, loc_dict, depth=0):
+    """Recursively resolves a Stellaris name={...} or value={...} block, including [Bracket] and $Dollar$ variables."""
+    if not node_blk or depth > 6:
+        return ""
+
+    lit_m = re.search(r'\bkey="((?:\\.|[^"\\])*)"\s+literal=yes', node_blk)
+    if lit_m:
+        return lit_m.group(1).replace('\\"', '"')
+
+    key_m = re.search(r'\bkey="([^"]+)"', node_blk)
+    if not key_m:
+        return ""
+
+    raw_key = key_m.group(1)
+    template = loc_dict.get(raw_key, raw_key)
+
+    var_m = re.search(r'\bvariables\s*=\s*\{', node_blk)
+    if var_m:
+        var_blk = extract_block(node_blk, var_m.end() - 1)
+        pos = 1
+        while pos < len(var_blk):
+            open_idx = var_blk.find('{', pos)
+            if open_idx == -1:
+                break
+            entry_blk = extract_block(var_blk, open_idx)
+            if not entry_blk:
+                break
+            pos = open_idx + len(entry_blk)
+
+            k_m = re.search(r'\bkey="([^"]+)"', entry_blk)
+            v_m = re.search(r'\bvalue\s*=\s*\{', entry_blk)
+            if k_m and v_m:
+                var_key = k_m.group(1)
+                val_blk = extract_block(entry_blk, v_m.end() - 1)
+                val_str = resolve_name_node(val_blk, loc_dict, depth + 1)
+                for token in (f"${var_key}$", f"%{var_key}%", f"[{var_key}]"):
+                    template = template.replace(token, val_str)
+                template = re.sub(re.escape(f"[{var_key}]"), val_str, template, flags=re.IGNORECASE)
+
+    template = resolve_loc_references(template, loc_dict)
+    template = re.sub(r'\$[A-Za-z0-9_.]+\$|%[A-Za-z0-9_.]+%', '', template).strip()
+    return re.sub(r'§[A-Za-z!]', '', template).strip()
+
+
+def resolve_saved_name(block_text, loc_dict, default="Unknown", system_names=None):
     name_m = re.search(r'\bname\s*=\s*\{', block_text)
     if name_m:
         name_blk = extract_block(block_text, name_m.end() - 1)
-        lit_m = re.search(r'\bkey="([^"]+)"\s+literal=yes', name_blk)
-        if lit_m:
-            return lit_m.group(1)
-        key_m = re.search(r'\bkey="([^"]+)"', name_blk)
-        if key_m:
-            raw_key = key_m.group(1)
-            template = loc_dict.get(raw_key, raw_key)
-            var_m = re.search(r'\bvariables\s*=\s*\{', name_blk)
-            if var_m:
-                var_blk = extract_block(name_blk, var_m.end() - 1)
-                for vm in re.finditer(r'\{\s*key="([^"]+)"\s+value=\s*\{\s*key="([^"]+)"', var_blk):
-                    k, v = vm.group(1), vm.group(2)
-                    val_str = loc_dict.get(v, v)
-                    template = template.replace(f"${k}$", val_str).replace(f"%{k}%", val_str)
-            template = resolve_loc_references(template, loc_dict)
-            template = re.sub(r'\$[A-Za-z0-9_.]+\$|%[A-Za-z0-9_.]+%', '', template).strip()
-            return re.sub(r'§[A-Za-z!]', '', template) if template else raw_key
+        resolved = resolve_name_node(name_blk, loc_dict)
+        if resolved:
+            if '[' in resolved and system_names:
+                coord_m = re.search(r'\bcoordinate\s*=\s*\{', block_text)
+                if coord_m:
+                    coord_blk = extract_block(block_text, coord_m.end() - 1)
+                    orig_m = re.search(r'\borigin\s*=\s*(\d+)', coord_blk)
+                    if orig_m and orig_m.group(1) in system_names:
+                        sys_str = system_names[orig_m.group(1)]
+                        resolved = re.sub(r'\[[^\]]*Solar_System[^\]]*\]', sys_str, resolved, flags=re.IGNORECASE)
+            resolved = re.sub(r'\[[^\]]+\]', '', resolved).strip()
+            return resolved if resolved else default
 
     str_m = re.search(r'\bname="([^"]+)"', block_text)
     if str_m:
@@ -633,11 +776,9 @@ def extract_empire_progression(p_data):
         if civ_m:
             civics = re.findall(r'"([^"]+)"', civ_m.group(1))
 
-        # Remove council_agenda_cooldowns blocks before searching for the active council_agenda
         gov_blk_no_cd = gov_blk
         for cd_m in re.finditer(r'\bcouncil_agenda_cooldowns\s*=\s*\{', gov_blk):
             cd_blk = extract_block(gov_blk, cd_m.end() - 1)
-            # Use findall so ALL agendas inside council_agenda_cooldowns are captured
             for ag_name in re.findall(r'\bcouncil_agenda\s*=\s*"([^"]+)"', cd_blk):
                 cooldown_agendas.append(ag_name)
             gov_blk_no_cd = gov_blk_no_cd.replace(cd_blk, "", 1)
@@ -685,6 +826,208 @@ def extract_empire_progression(p_data):
         "traditions": traditions,
         "ascension_perks": ascension_perks,
         "techs": techs
+    }
+
+
+def select_closest_neighbors(start_id, adjacency_list, neighbor_limit, avoid_systems=None):
+    """Uses BFS to find N nearest systems, prioritizing non-avoided systems."""
+    if avoid_systems is None:
+        avoid_systems = set()
+
+    claimed_systems = {start_id}
+    resulting_lanes = set()
+    candidates = []
+
+    temp_queue = [(start_id, 0)]
+    temp_processed = {start_id}
+
+    while temp_queue and len(temp_processed) < len(adjacency_list):
+        current_id, current_distance = temp_queue.pop(0)
+        for neighbor_id in adjacency_list.get(current_id, set()):
+            if neighbor_id not in temp_processed:
+                temp_processed.add(neighbor_id)
+                is_avoided = neighbor_id in avoid_systems
+                candidates.append((neighbor_id, current_distance + 1, is_avoided))
+                temp_queue.append((neighbor_id, current_distance + 1))
+
+    candidates.sort(key=lambda x: (x[1], x[2]))
+
+    for i in range(min(neighbor_limit, len(candidates))):
+        claimed_systems.add(candidates[i][0])
+
+    final_lane_queue = [start_id]
+    final_processed_lanes = {start_id}
+    while final_lane_queue:
+        current_id = final_lane_queue.pop(0)
+        for neighbor_id in adjacency_list.get(current_id, set()):
+            if neighbor_id in claimed_systems:
+                resulting_lanes.add(tuple(sorted((current_id, neighbor_id))))
+                if neighbor_id not in final_processed_lanes:
+                    final_processed_lanes.add(neighbor_id)
+                    final_lane_queue.append(neighbor_id)
+
+    return claimed_systems, resulting_lanes
+
+
+def resolve_conflicts_by_rerouting(homeworld_ids, adjacency_list, neighbor_limit=5):
+    """Runs initial BFS reach and reroutes around other homeworlds' claims to detect illegal spawns."""
+    initial_lanes = {}
+    initial_claims = defaultdict(set)
+    for start_id in homeworld_ids:
+        claimed, lanes = select_closest_neighbors(start_id, adjacency_list, neighbor_limit)
+        initial_lanes[start_id] = lanes
+        for sys_id in claimed:
+            initial_claims[sys_id].add(start_id)
+
+    conflict_systems = {sys_id for sys_id, hws in initial_claims.items() if len(hws) > 1}
+    if not conflict_systems:
+        return initial_lanes, dict(initial_claims), conflict_systems
+
+    rerouted_lanes = {}
+    rerouted_claims = defaultdict(set)
+    for hw_id in sorted(homeworld_ids):
+        avoid_set = {sys_id for sys_id, hws in rerouted_claims.items() if hw_id not in hws}
+        claimed, lanes = select_closest_neighbors(hw_id, adjacency_list, neighbor_limit, avoid_systems=avoid_set)
+        rerouted_lanes[hw_id] = lanes
+        for sys_id in claimed:
+            rerouted_claims[sys_id].add(hw_id)
+
+    final_conflicts = {sys_id for sys_id, hws in rerouted_claims.items() if len(hws) > 1}
+    return rerouted_lanes, dict(rerouted_claims), final_conflicts
+
+
+def extract_galaxy_map_data(gamestate, loc_dict, player_map):
+    """
+    Extracts static galaxy coordinates, hyperlanes, POIs, homeworlds, and 5-jump spawn conflict data
+    once from the first save of the campaign.
+    """
+    planet_to_system = {}
+    planets_block = get_major_block(gamestate, "planets")
+    if planets_block:
+        for p_id, p_blk in get_top_level_blocks(planets_block).items():
+            coord_m = re.search(r'\bcoordinate\s*=\s*\{', p_blk)
+            if coord_m:
+                coord_blk = extract_block(p_blk, coord_m.end() - 1)
+                orig_m = re.search(r'\borigin\s*=\s*(\d+)', coord_blk)
+                if orig_m:
+                    planet_to_system[p_id] = int(orig_m.group(1))
+
+    hw_owners = {}
+    country_block = get_major_block(gamestate, "country")
+    if country_block:
+        for cid, c_blk in get_top_level_blocks(country_block).items():
+            if cid not in player_map:
+                continue
+            cap_m = re.search(r'\bcapital\s*=\s*(\d+)', c_blk)
+            if cap_m and cap_m.group(1) in planet_to_system:
+                sys_id = planet_to_system[cap_m.group(1)]
+                emp_name = resolve_saved_name(c_blk, loc_dict, player_map[cid])
+                hw_owners[sys_id] = {
+                    "pid": cid,
+                    "player": player_map[cid],
+                    "empire": emp_name
+                }
+
+    gal_obj_block = get_major_block(gamestate, "galactic_object")
+    if not gal_obj_block:
+        return {}
+
+    systems = {}
+    adjacency_list = defaultdict(set)
+    unique_hyperlanes = set()
+    homeworld_ids = set()
+
+    for sys_id_str, sys_blk in get_top_level_blocks(gal_obj_block).items():
+        sys_id = int(sys_id_str)
+        coord_m = re.search(r'\bcoordinate\s*=\s*\{', sys_blk)
+        if not coord_m:
+            continue
+        coord_blk = extract_block(sys_blk, coord_m.end() - 1)
+        x_m = re.search(r'\bx\s*=\s*([-\d\.]+)', coord_blk)
+        y_m = re.search(r'\by\s*=\s*([-\d\.]+)', coord_blk)
+        if not x_m or not y_m:
+            continue
+
+        x = -float(x_m.group(1))
+        y = float(y_m.group(1))
+        sys_name = resolve_saved_name(sys_blk, loc_dict, f"System {sys_id}")
+
+        flags_m = re.search(r'\bflags\s*=\s*\{', sys_blk)
+        flags_blk = extract_block(sys_blk, flags_m.end() - 1) if flags_m else ""
+
+        is_hw = ("empire_home_system=" in flags_blk) or (sys_id in hw_owners)
+        if is_hw:
+            homeworld_ids.add(sys_id)
+
+        is_marauder = "marauder_system=" in flags_blk
+        is_fe = bool(re.search(r'\binitializer\s*=\s*"fallen_', sys_blk))
+        is_t1_t2 = ("neighbor_t1_first_colony=" in flags_blk) or ("neighbor_t2_second_colony=" in flags_blk)
+
+        wanderlust = [
+            w_key for w_key in WANDERLUST_FLAG_LABELS
+            if re.search(rf'\b{w_key}\b', flags_blk)
+        ]
+
+        enclave_type = None
+        if "enclave=" in sys_blk or "enclave" in flags_blk:
+            for e_key in ENCLAVE_TYPES:
+                if re.search(rf'\b{e_key}\w*_system\s*=', sys_blk):
+                    enclave_type = e_key
+                    break
+            if not enclave_type and "enclave=" in sys_blk:
+                enclave_type = "mercenary"
+
+        for hl_m in re.finditer(r'\bhyperlane\s*=\s*\{', sys_blk):
+            hl_blk = extract_block(sys_blk, hl_m.end() - 1)
+            for to_str in re.findall(r'\bto\s*=\s*(\d+)', hl_blk):
+                to_id = int(to_str)
+                unique_hyperlanes.add(tuple(sorted((sys_id, to_id))))
+                adjacency_list[sys_id].add(to_id)
+                adjacency_list[to_id].add(sys_id)
+
+        systems[sys_id] = {
+            "id": sys_id,
+            "name": sys_name,
+            "x": round(x, 2),
+            "y": round(y, 2),
+            "is_homeworld": is_hw,
+            "owner": hw_owners.get(sys_id),
+            "is_marauder": is_marauder,
+            "is_fe": is_fe,
+            "is_t1_t2": is_t1_t2,
+            "enclave": enclave_type,
+            "wanderlust": wanderlust
+        }
+
+    reach_lanes_by_hw, final_claims, final_conflicts = resolve_conflicts_by_rerouting(
+        homeworld_ids, adjacency_list, neighbor_limit=5
+    )
+
+    all_reach_lanes = set()
+    for lanes in reach_lanes_by_hw.values():
+        all_reach_lanes.update(lanes)
+
+    conflict_lanes = {
+        lane for lane in all_reach_lanes
+        if lane[0] in final_conflicts or lane[1] in final_conflicts
+    }
+    safe_reach_lanes = all_reach_lanes - conflict_lanes
+    normal_lanes = unique_hyperlanes - all_reach_lanes
+
+    for sys_id, sys_obj in systems.items():
+        claimants = sorted(list(final_claims.get(sys_id, set())))
+        sys_obj["claimed_by"] = [
+            hw_owners[hw]["player"] if hw in hw_owners else f"Homeworld #{hw}"
+            for hw in claimants
+        ]
+        sys_obj["is_conflict"] = sys_id in final_conflicts
+
+    return {
+        "systems": list(systems.values()),
+        "normal_lanes": [list(l) for l in sorted(normal_lanes)],
+        "reach_lanes": [list(l) for l in sorted(safe_reach_lanes)],
+        "conflict_lanes": [list(l) for l in sorted(conflict_lanes)],
+        "conflict_system_ids": sorted(list(final_conflicts))
     }
 
 
@@ -870,7 +1213,7 @@ def process_single_save(task):
             "templates": list(design_groups.values())
         }
 
-    # 7. Assemble Player Stats & Progression Snapshots (including eliminated empires!)
+    # 7. Assemble Player Stats & Progression Snapshots (including eliminated empires)
     player_stats = {}
     player_progression = {}
     empire_names = {}
@@ -879,7 +1222,6 @@ def process_single_save(task):
     for pid in player_pids:
         p_data = player_country_blocks.get(pid)
         if not p_data:
-            # Country block removed from country.txt -> Empire is completely eliminated on this date
             player_stats[pid] = {
                 "date": date,
                 "alive": False,
@@ -938,7 +1280,6 @@ def process_single_save(task):
                 owned_fleets_data.append(all_fleets[fid])
                 total_fleet_power += all_fleets[fid]["power"]
 
-        # An empire is alive if it owns at least 1 colony (and controls > 0 or has fleet power) or is an active nomad
         is_alive = (owned_planets_count > 0 and (controlled_planets_count > 0 or total_fleet_power > 0)) or (is_nomadic and total_fleet_power > 0)
         display_planets = controlled_planets_count if controlled_planets_count < owned_planets_count else owned_planets_count
 
@@ -963,7 +1304,13 @@ def process_single_save(task):
             "fleets": owned_fleets_data if is_alive else []
         }
 
-    # 8. Extract Planets & Raw Queue Items
+    # 8. Extract Planets & Raw Queue Items (with Star System coordinate fallback for Habitats)
+    system_names = {}
+    gal_obj_block = get_major_block(gamestate, "galactic_object")
+    if gal_obj_block:
+        for sys_id, sys_blk in get_top_level_blocks(gal_obj_block).items():
+            system_names[sys_id] = resolve_saved_name(sys_blk, loc_dict, f"System {sys_id}")
+
     colony_map = {}
     new_owners = {}
     planet_names = {}
@@ -977,7 +1324,7 @@ def process_single_save(task):
             if owner_match:
                 new_owners[p_id] = owner_match.group(1)
 
-            name_val = resolve_saved_name(p_block_str, loc_dict, "Unknown Planet")
+            name_val = resolve_saved_name(p_block_str, loc_dict, "Unknown Planet", system_names)
             if name_val != "Unknown Planet":
                 planet_names[p_id] = name_val
 
@@ -1031,13 +1378,7 @@ def main():
     print(f"\nFound {len(sav_files)} save files. Processing...")
     loc_dict = load_stellaris_localization(game_folder)
     comp_icons, entity_icons, tech_catalog = build_game_catalog(game_folder)
-
-    ui_icon_map = {}
-    for raw_key, dds_path in entity_icons.items():
-        ui_icon_map[raw_key] = dds_path
-        clean_name = clean_loc(raw_key, loc_dict)
-        if clean_name and clean_name not in ui_icon_map:
-            ui_icon_map[clean_name] = dds_path
+    ui_icon_map = build_ui_icon_map(entity_icons, loc_dict)
 
     print("\n[2/4] Extracting dates and identifying campaign...")
     saves_metadata = []
@@ -1058,7 +1399,6 @@ def main():
     saves_metadata.sort(key=lambda x: x['date'])
     campaign_name = re.sub(r'[\\/*?:"<>|]', "", saves_metadata[-1]['name'])
 
-    # Combine players from both the first and last save so players eliminated mid-game keep their real names
     first_gamestate = extract_gamestate_content(saves_metadata[0]['filepath'])
     latest_gamestate = extract_gamestate_content(saves_metadata[-1]['filepath'])
     player_map = extract_player_names(first_gamestate)
@@ -1067,9 +1407,13 @@ def main():
             if not pname.startswith("Defeated Player"):
                 player_map[pid] = pname
 
+    print("      -> Generating static Galaxy & Spawn Check Map from initial save...")
+    galaxy_map_data = extract_galaxy_map_data(first_gamestate, loc_dict, player_map)
+
     timeline_data = {
         "campaign_name": campaign_name,
         "icons": ui_icon_map,
+        "galaxy_map": galaxy_map_data,
         "players": {}
     }
     for pid, pname in player_map.items():
@@ -1179,25 +1523,29 @@ def main():
                     empire_events[pid].append({
                         "date": date,
                         "type": "AGENDA_SELECTED",
-                        "item": clean_loc(prog["council_agenda"], loc_dict)
+                        "item": clean_loc(prog["council_agenda"], loc_dict),
+                        "key": prog["council_agenda"]
                     })
                 for ag in prog["cooldown_agendas"]:
                     empire_events[pid].append({
                         "date": date,
                         "type": "AGENDA_LAUNCHED",
-                        "item": clean_loc(ag, loc_dict)
+                        "item": clean_loc(ag, loc_dict),
+                        "key": ag
                     })
                 for t in prog["traditions"]:
                     empire_events[pid].append({
                         "date": date,
                         "type": "TRADITION",
-                        "item": format_tradition_name(t, loc_dict)
+                        "item": format_tradition_name(t, loc_dict),
+                        "key": t
                     })
                 for ap in prog["ascension_perks"]:
                     empire_events[pid].append({
                         "date": date,
                         "type": "ASCENSION_PERK",
-                        "item": clean_loc(ap, loc_dict)
+                        "item": clean_loc(ap, loc_dict),
+                        "key": ap
                     })
                 for t_key, lvl in prog["techs"]:
                     tech_events[pid].append(make_tech_event(date, t_key, lvl, True))
@@ -1217,7 +1565,8 @@ def main():
                         empire_events[pid].append({
                             "date": date,
                             "type": "TRADITION",
-                            "item": format_tradition_name(t, loc_dict)
+                            "item": format_tradition_name(t, loc_dict),
+                            "key": t
                         })
 
                 # 3. Ascension Perks unlocked
@@ -1227,7 +1576,8 @@ def main():
                         empire_events[pid].append({
                             "date": date,
                             "type": "ASCENSION_PERK",
-                            "item": clean_loc(ap, loc_dict)
+                            "item": clean_loc(ap, loc_dict),
+                            "key": ap
                         })
 
                 # 4. Government or Authority changed
@@ -1240,7 +1590,8 @@ def main():
                     empire_events[pid].append({
                         "date": date,
                         "type": "GOV_CHANGED",
-                        "item": f"{old_desc} → {new_desc}"
+                        "item": f"{old_desc} → {new_desc}",
+                        "key": new_gov or new_auth
                     })
                     st["gov_type"] = new_gov
                     st["authority"] = new_auth
@@ -1248,34 +1599,40 @@ def main():
                 # 5. Ethics shifted
                 curr_ethics = set(prog["ethics"])
                 if curr_ethics and curr_ethics != st["ethics"]:
-                    added = [clean_loc(e, loc_dict) for e in (curr_ethics - st["ethics"])]
-                    removed = [clean_loc(e, loc_dict) for e in (st["ethics"] - curr_ethics)]
+                    added_raw = sorted(curr_ethics - st["ethics"])
+                    removed_raw = sorted(st["ethics"] - curr_ethics)
+                    added = [clean_loc(e, loc_dict) for e in added_raw]
+                    removed = [clean_loc(e, loc_dict) for e in removed_raw]
                     parts = []
                     if added: parts.append(f"+{', '.join(added)}")
                     if removed: parts.append(f"-{', '.join(removed)}")
                     empire_events[pid].append({
                         "date": date,
                         "type": "ETHICS_CHANGED",
-                        "item": " / ".join(parts)
+                        "item": " / ".join(parts),
+                        "key": added_raw[0] if added_raw else ""
                     })
                     st["ethics"] = curr_ethics
 
                 # 6. Civics reformed
                 curr_civics = set(prog["civics"])
                 if curr_civics != st["civics"]:
-                    added = [clean_loc(c, loc_dict) for c in (curr_civics - st["civics"])]
-                    removed = [clean_loc(c, loc_dict) for c in (st["civics"] - curr_civics)]
+                    added_raw = sorted(curr_civics - st["civics"])
+                    removed_raw = sorted(st["civics"] - curr_civics)
+                    added = [clean_loc(c, loc_dict) for c in added_raw]
+                    removed = [clean_loc(c, loc_dict) for c in removed_raw]
                     parts = []
                     if added: parts.append(f"+{', '.join(added)}")
                     if removed: parts.append(f"-{', '.join(removed)}")
                     empire_events[pid].append({
                         "date": date,
                         "type": "CIVICS_CHANGED",
-                        "item": " / ".join(parts)
+                        "item": " / ".join(parts),
+                        "key": added_raw[0] if added_raw else ""
                     })
                     st["civics"] = curr_civics
 
-                # 7. Agenda Launched (stamped with save 'date' whenever an agenda enters council_agenda_cooldowns or timed_modifier)
+                # 7. Agenda Launched
                 curr_cd_agendas = set(prog["cooldown_agendas"])
                 newly_launched = set()
                 for ag in (curr_cd_agendas - st["cooldown_agendas"]):
@@ -1283,7 +1640,8 @@ def main():
                     empire_events[pid].append({
                         "date": date,
                         "type": "AGENDA_LAUNCHED",
-                        "item": clean_loc(ag, loc_dict)
+                        "item": clean_loc(ag, loc_dict),
+                        "key": ag
                     })
                 st["cooldown_agendas"] = curr_cd_agendas
 
@@ -1294,7 +1652,8 @@ def main():
                         empire_events[pid].append({
                             "date": date,
                             "type": "AGENDA_LAUNCHED",
-                            "item": clean_loc(ag_base, loc_dict)
+                            "item": clean_loc(ag_base, loc_dict),
+                            "key": ag_base
                         })
                 st["finish_modifiers"] = curr_mods
 
@@ -1305,7 +1664,8 @@ def main():
                         empire_events[pid].append({
                             "date": date,
                             "type": "AGENDA_SELECTED",
-                            "item": clean_loc(new_ag, loc_dict)
+                            "item": clean_loc(new_ag, loc_dict),
+                            "key": new_ag
                         })
                     st["council_agenda"] = new_ag
 
@@ -1351,7 +1711,7 @@ def main():
                 date, evt_type, evt_data = event
                 if evt_type == "BUILD":
                     clean_item = clean_loc(evt_data, loc_dict)
-                    clean_builds.append({"date": date, "type": "BUILD", "item": clean_item})
+                    clean_builds.append({"date": date, "type": "BUILD", "item": clean_item, "key": evt_data})
                 elif evt_type in ["TAKEN", "LOST"]:
                     clean_builds.append({
                         "date": date,
@@ -1361,7 +1721,7 @@ def main():
                 elif evt_type == "COLONIZED":
                     clean_builds.append({"date": date, "type": "COLONIZED", "item": None})
             timeline_data["players"][pid]["planets"][planet_id] = {
-                "name": clean_loc(raw_planet_name, loc_dict),
+                "name": raw_planet_name,
                 "builds": clean_builds
             }
 

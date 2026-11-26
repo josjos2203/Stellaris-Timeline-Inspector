@@ -75,25 +75,12 @@ def get_folder_latest_mtime(folder_path):
 
 
 class LiveCampaignIncrementalBuilder:
-    """Caches file headers and parsed save results so save #338 is just as fast as save #1."""
+    """Caches file headers, static galaxy map, and parsed save results so save #338 is just as fast as save #1."""
     def __init__(self, game_folder):
         self.game_folder = game_folder
         self.loc_dict = boe.load_stellaris_localization(game_folder)
         self.comp_icons, self.entity_icons, self.tech_catalog = boe.build_game_catalog(game_folder)
-
-        self.ui_icon_map = {}
-        for raw_key, dds_path in self.entity_icons.items():
-            self.ui_icon_map[raw_key] = dds_path
-            clean_name = boe.clean_loc(raw_key, self.loc_dict)
-            if clean_name and clean_name not in self.ui_icon_map:
-                self.ui_icon_map[clean_name] = dds_path
-
-        # campaign_folder_name -> {
-        #   "parsed_by_date": {date: res},
-        #   "file_header_cache": {filepath: (mtime, date_str, camp_name)},
-        #   "player_map": {...},
-        #   "campaign_name": str
-        # }
+        self.ui_icon_map = boe.build_ui_icon_map(self.entity_icons, self.loc_dict)
         self.campaigns = {}
 
     def sync_and_archive_saves(self, src_dir, backup_dir):
@@ -111,7 +98,6 @@ class LiveCampaignIncrementalBuilder:
             dest_raw = os.path.join(backup_dir, entry.name)
             src_mtime = entry.stat().st_mtime
 
-            # Skip copying if the file in Stellaris_Backups is already identical in timestamp and size
             if os.path.exists(dest_raw):
                 dest_stat = os.stat(dest_raw)
                 if abs(src_mtime - dest_stat.st_mtime) < 0.1 and entry.stat().st_size == dest_stat.st_size:
@@ -143,6 +129,7 @@ class LiveCampaignIncrementalBuilder:
                 "parsed_by_date": {},
                 "file_header_cache": {},
                 "player_map": {},
+                "galaxy_map": None,
                 "campaign_name": folder_name
             }
 
@@ -152,7 +139,6 @@ class LiveCampaignIncrementalBuilder:
         saves_by_date = {}
         campaign_raw_name = camp["campaign_name"]
 
-        # O(1) header scan: only opens .sav files whose mtime has changed
         for entry in os.scandir(backup_dir):
             if not entry.is_file() or not entry.name.endswith('.sav'):
                 continue
@@ -186,10 +172,11 @@ class LiveCampaignIncrementalBuilder:
         campaign_name = re.sub(r'[\\/*?:"<>|]', "", campaign_raw_name)
         camp["campaign_name"] = campaign_name
 
-        # Initialize player_map ONCE on the first save of the campaign (no double-decompression on every autosave)
+        # Initialize player_map and static galaxy_map ONCE from the earliest save
         if not camp["player_map"]:
             first_gs = boe.extract_gamestate_content(saves_by_date[sorted_dates[0]])
             camp["player_map"] = boe.extract_player_names(first_gs)
+            camp["galaxy_map"] = boe.extract_galaxy_map_data(first_gs, self.loc_dict, camp["player_map"])
 
         player_pids = list(camp["player_map"].keys())
         unparsed_dates = [d for d in sorted_dates if d not in camp["parsed_by_date"]]
@@ -198,14 +185,12 @@ class LiveCampaignIncrementalBuilder:
             return
 
         t0 = time.time()
-        # Single-core in-process parse for 1-2 live saves (zero process-spawn overhead)
         if len(unparsed_dates) <= 2:
             boe.init_worker(self.loc_dict, player_pids, self.comp_icons)
             for d_str in unparsed_dates:
                 task = (0, 1, d_str, saves_by_date[d_str])
                 camp["parsed_by_date"][d_str] = boe.process_single_save(task)
         else:
-            # Multi-core catch-up if starting autosaver mid-campaign with dozens of existing saves
             max_workers = max(1, min(4, (os.cpu_count() or 4) - 1))
             tasks = [(i, len(unparsed_dates), d_str, saves_by_date[d_str]) for i, d_str in enumerate(unparsed_dates)]
             with ProcessPoolExecutor(
@@ -219,14 +204,18 @@ class LiveCampaignIncrementalBuilder:
                     camp["parsed_by_date"][d_str] = future.result()
 
         ordered_results = [camp["parsed_by_date"][d] for d in sorted_dates if d in camp["parsed_by_date"]]
-        timeline_data = self._reconcile_results(campaign_name, camp["player_map"], ordered_results)
+        timeline_data = self._reconcile_results(
+            campaign_name,
+            camp["player_map"],
+            ordered_results,
+            camp["galaxy_map"]
+        )
 
         os.makedirs(OUTPUT_FOLDER, exist_ok=True)
         out_filename = f"{campaign_name}_timeline.json"
         final_path = os.path.join(OUTPUT_FOLDER, out_filename)
         temp_path = os.path.join(OUTPUT_FOLDER, f".{out_filename}.tmp")
 
-        # Compact separators=(',', ':') cuts file size & write time by ~50% at 300+ saves
         with open(temp_path, "w", encoding="utf-8") as f:
             json.dump(timeline_data, f, separators=(',', ':'), ensure_ascii=False)
 
@@ -237,7 +226,7 @@ class LiveCampaignIncrementalBuilder:
             f"(Total: {len(ordered_results)} | Latest: {sorted_dates[-1]}) in {elapsed:.2f}s"
         )
 
-    def _reconcile_results(self, campaign_name, player_map, results):
+    def _reconcile_results(self, campaign_name, player_map, results, galaxy_map=None):
         loc_dict = self.loc_dict
         tech_catalog = self.tech_catalog
 
@@ -245,6 +234,7 @@ class LiveCampaignIncrementalBuilder:
             "campaign_name": campaign_name,
             "last_updated": time.time(),
             "icons": self.ui_icon_map,
+            "galaxy_map": galaxy_map or {},
             "players": {}
         }
         for pid, pname in player_map.items():
@@ -319,25 +309,29 @@ class LiveCampaignIncrementalBuilder:
                         empire_events[pid].append({
                             "date": date,
                             "type": "AGENDA_SELECTED",
-                            "item": boe.clean_loc(prog["council_agenda"], loc_dict)
+                            "item": boe.clean_loc(prog["council_agenda"], loc_dict),
+                            "key": prog["council_agenda"]
                         })
                     for ag in prog["cooldown_agendas"]:
                         empire_events[pid].append({
                             "date": date,
                             "type": "AGENDA_LAUNCHED",
-                            "item": boe.clean_loc(ag, loc_dict)
+                            "item": boe.clean_loc(ag, loc_dict),
+                            "key": ag
                         })
                     for t in prog["traditions"]:
                         empire_events[pid].append({
                             "date": date,
                             "type": "TRADITION",
-                            "item": boe.format_tradition_name(t, loc_dict)
+                            "item": boe.format_tradition_name(t, loc_dict),
+                            "key": t
                         })
                     for ap in prog["ascension_perks"]:
                         empire_events[pid].append({
                             "date": date,
                             "type": "ASCENSION_PERK",
-                            "item": boe.clean_loc(ap, loc_dict)
+                            "item": boe.clean_loc(ap, loc_dict),
+                            "key": ap
                         })
                     for t_key, lvl in prog["techs"]:
                         tech_events[pid].append(make_tech_event(date, t_key, lvl, True))
@@ -354,7 +348,8 @@ class LiveCampaignIncrementalBuilder:
                             empire_events[pid].append({
                                 "date": date,
                                 "type": "TRADITION",
-                                "item": boe.format_tradition_name(t, loc_dict)
+                                "item": boe.format_tradition_name(t, loc_dict),
+                                "key": t
                             })
 
                     for ap in prog["ascension_perks"]:
@@ -363,7 +358,8 @@ class LiveCampaignIncrementalBuilder:
                             empire_events[pid].append({
                                 "date": date,
                                 "type": "ASCENSION_PERK",
-                                "item": boe.clean_loc(ap, loc_dict)
+                                "item": boe.clean_loc(ap, loc_dict),
+                                "key": ap
                             })
 
                     new_gov, new_auth = prog["gov_type"], prog["authority"]
@@ -375,36 +371,43 @@ class LiveCampaignIncrementalBuilder:
                         empire_events[pid].append({
                             "date": date,
                             "type": "GOV_CHANGED",
-                            "item": f"{old_desc} → {new_desc}"
+                            "item": f"{old_desc} → {new_desc}",
+                            "key": new_gov or new_auth
                         })
                         st["gov_type"] = new_gov
                         st["authority"] = new_auth
 
                     curr_ethics = set(prog["ethics"])
                     if curr_ethics and curr_ethics != st["ethics"]:
-                        added = [boe.clean_loc(e, loc_dict) for e in (curr_ethics - st["ethics"])]
-                        removed = [boe.clean_loc(e, loc_dict) for e in (st["ethics"] - curr_ethics)]
+                        added_raw = sorted(curr_ethics - st["ethics"])
+                        removed_raw = sorted(st["ethics"] - curr_ethics)
+                        added = [boe.clean_loc(e, loc_dict) for e in added_raw]
+                        removed = [boe.clean_loc(e, loc_dict) for e in removed_raw]
                         parts = []
                         if added: parts.append(f"+{', '.join(added)}")
                         if removed: parts.append(f"-{', '.join(removed)}")
                         empire_events[pid].append({
                             "date": date,
                             "type": "ETHICS_CHANGED",
-                            "item": " / ".join(parts)
+                            "item": " / ".join(parts),
+                            "key": added_raw[0] if added_raw else ""
                         })
                         st["ethics"] = curr_ethics
 
                     curr_civics = set(prog["civics"])
                     if curr_civics != st["civics"]:
-                        added = [boe.clean_loc(c, loc_dict) for c in (curr_civics - st["civics"])]
-                        removed = [boe.clean_loc(c, loc_dict) for c in (st["civics"] - curr_civics)]
+                        added_raw = sorted(curr_civics - st["civics"])
+                        removed_raw = sorted(st["civics"] - curr_civics)
+                        added = [boe.clean_loc(c, loc_dict) for c in added_raw]
+                        removed = [boe.clean_loc(c, loc_dict) for c in removed_raw]
                         parts = []
                         if added: parts.append(f"+{', '.join(added)}")
                         if removed: parts.append(f"-{', '.join(removed)}")
                         empire_events[pid].append({
                             "date": date,
                             "type": "CIVICS_CHANGED",
-                            "item": " / ".join(parts)
+                            "item": " / ".join(parts),
+                            "key": added_raw[0] if added_raw else ""
                         })
                         st["civics"] = curr_civics
 
@@ -415,7 +418,8 @@ class LiveCampaignIncrementalBuilder:
                         empire_events[pid].append({
                             "date": date,
                             "type": "AGENDA_LAUNCHED",
-                            "item": boe.clean_loc(ag, loc_dict)
+                            "item": boe.clean_loc(ag, loc_dict),
+                            "key": ag
                         })
                     st["cooldown_agendas"] = curr_cd_agendas
 
@@ -426,7 +430,8 @@ class LiveCampaignIncrementalBuilder:
                             empire_events[pid].append({
                                 "date": date,
                                 "type": "AGENDA_LAUNCHED",
-                                "item": boe.clean_loc(ag_base, loc_dict)
+                                "item": boe.clean_loc(ag_base, loc_dict),
+                                "key": ag_base
                             })
                     st["finish_modifiers"] = curr_mods
 
@@ -436,7 +441,8 @@ class LiveCampaignIncrementalBuilder:
                             empire_events[pid].append({
                                 "date": date,
                                 "type": "AGENDA_SELECTED",
-                                "item": boe.clean_loc(new_ag, loc_dict)
+                                "item": boe.clean_loc(new_ag, loc_dict),
+                                "key": new_ag
                             })
                         st["council_agenda"] = new_ag
 
@@ -481,7 +487,7 @@ class LiveCampaignIncrementalBuilder:
                     date, evt_type, evt_data = event
                     if evt_type == "BUILD":
                         clean_item = boe.clean_loc(evt_data, loc_dict)
-                        clean_builds.append({"date": date, "type": "BUILD", "item": clean_item})
+                        clean_builds.append({"date": date, "type": "BUILD", "item": clean_item, "key": evt_data})
                     elif evt_type in ["TAKEN", "LOST"]:
                         clean_builds.append({
                             "date": date,
@@ -491,7 +497,7 @@ class LiveCampaignIncrementalBuilder:
                     elif evt_type == "COLONIZED":
                         clean_builds.append({"date": date, "type": "COLONIZED", "item": None})
                 timeline_data["players"][pid]["planets"][planet_id] = {
-                    "name": boe.clean_loc(raw_planet_name, loc_dict),
+                    "name": raw_planet_name,
                     "builds": clean_builds
                 }
 
@@ -543,7 +549,6 @@ def main():
                     backup_path = os.path.join(DESTINATION_FOLDER, entry.name)
 
                     try:
-                        # Wait 2 seconds after Stellaris finishes writing so MP unpause network ticks settle first
                         time.sleep(2.0)
                         live_builder.sync_and_archive_saves(entry.path, backup_path)
                         print(f"[{datetime.now().strftime('%H:%M:%S')}] Change detected! Synced folder: {entry.name}")
