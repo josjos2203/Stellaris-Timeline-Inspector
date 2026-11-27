@@ -13,15 +13,59 @@ from setup_config import get_stellaris_dir
 # Pre-compiled global regexes for worker processes
 TOP_LEVEL_PATTERN = re.compile(r'(?:^|\n)\s*(\d+)\s*=\s*\{')
 NAMED_BLOCK_PATTERN = re.compile(r'(?:^|\n)\s*([A-Za-z0-9_\.\-]+)\s*=\s*\{')
+TOP_KEY_BEFORE_BRACE = re.compile(r'([A-Za-z0-9_\.\-]+)\s*=\s*$')
 ITEM_PATTERN = re.compile(
     r'(\d+)=\s*\{[^{}]*queue=(\d+)\s*paying_country=(\d+)(?:(?!queue=)[\s\S]){1,300}?(?:building|district|zone)="([^"]+)"\s*planet=(\d+)'
 )
+
 RES_KEYS = [
     'energy', 'minerals', 'food', 'trade', 'alloys', 'consumer_goods',
     'physics_research', 'society_research', 'engineering_research',
     'unity', 'influence', 'minor_artifacts', 'volatile_motes',
     'exotic_gases', 'rare_crystals', 'sr_zro', 'nanites', 'sr_living_metal'
 ]
+RESEARCH_RES_KEYS = {'physics_research', 'society_research', 'engineering_research'}
+RES_DISPLAY_LABELS = {
+    'energy': 'Energy',
+    'minerals': 'Minerals',
+    'food': 'Food',
+    'trade': 'Trade',
+    'alloys': 'Alloys',
+    'consumer_goods': 'Consumer Goods',
+    'physics_research': 'Physics Research',
+    'society_research': 'Society Research',
+    'engineering_research': 'Engineering Research',
+    'unity': 'Unity',
+    'influence': 'Influence',
+    'minor_artifacts': 'Minor Artifacts',
+    'volatile_motes': 'Volatile Motes',
+    'exotic_gases': 'Exotic Gases',
+    'rare_crystals': 'Rare Crystals',
+    'sr_zro': 'Zro',
+    'nanites': 'Nanites',
+    'sr_living_metal': 'Living Metal',
+}
+RES_ICON_PATHS = {
+    'energy': '/gfx/interface/icons/resources/energy.dds',
+    'minerals': '/gfx/interface/icons/resources/minerals.dds',
+    'food': '/gfx/interface/icons/resources/food.dds',
+    'trade': '/gfx/interface/planetview/trade_value.dds',
+    'alloys': '/gfx/interface/icons/resources/alloys.dds',
+    'consumer_goods': '/gfx/interface/icons/resources/consumer_goods.dds',
+    'physics_research': '/gfx/interface/icons/resources/physics_research.dds',
+    'society_research': '/gfx/interface/icons/resources/society_research.dds',
+    'engineering_research': '/gfx/interface/icons/resources/engineering_research.dds',
+    'unity': '/gfx/interface/icons/resources/unity.dds',
+    'influence': '/gfx/interface/icons/resources/influence.dds',
+    'minor_artifacts': '/gfx/interface/icons/resources/minor_artifacts.dds',
+    'volatile_motes': '/gfx/interface/icons/resources/volatile_motes.dds',
+    'exotic_gases': '/gfx/interface/icons/resources/exotic_gases.dds',
+    'rare_crystals': '/gfx/interface/icons/resources/rare_crystals.dds',
+    'sr_zro': '/gfx/interface/icons/resources/sr_zro.dds',
+    'nanites': '/gfx/interface/icons/resources/nanites.dds',
+    'sr_living_metal': '/gfx/interface/icons/resources/sr_living_metal.dds',
+}
+
 NON_MILITARY_SIZES = {
     'constructor', 'science', 'colonizer', 'sponsored_colonizer', 'transport',
     'mining_station', 'research_station', 'observation_station',
@@ -40,10 +84,72 @@ WANDERLUST_FLAG_LABELS = {
     "space_ecology_system": "Space Ecology"
 }
 
+# --- LIVE NOTIFICATION RULES & THRESHOLDS ---
+MAJOR_FLEET_LOSS_MIN_POWER = 4000.0
+MAJOR_FLEET_LOSS_PCT = 0.20
+
+WATCHED_ALERT_TECHS = {
+    "tech_energy_torpedoes_1",              # Proton Launchers
+    "tech_energy_torpedoes_2",              # Neutron Launchers
+    "tech_zro_launcher",                    # Zro Launchers
+    "tech_arkship_stellar_igniter",         # Stellar Engine (Nomads)
+    "tech_materiality_engine",              # Materiality / Shroud Engine
+    "tech_subspace_drive",                  # Subspace Drive
+    "tech_starfire_cannon",                 # Starfire Cannon
+    "tech_capacity_boosters",               # Capacity Boosters
+    "tech_titans",                          # Titans
+    "tech_existential_campaigns",           # Existential Campaigns
+    "tech_deep_space_citadel",              # Deep Space Citadel
+    "tech_galactic_administration",         # Galactic Administration
+    "tech_ascension_theory",                # Ascension Theory
+    "tech_precognition_interface",          # Precognition Interface
+    "tech_psi_jump_drive_1",                # Psi Jump Drives
+    "tech_orbital_arc_furnace",             # Arc Furnace
+    "tech_housing_2",                       # Anti-Gravity Engineering
+    "tech_kinetic_artillery_1",             # Kinetic Battery
+    "tech_kinetic_artillery_2",             # Kinetic Artillery
+    "tech_mega_engineering",                # Mega-Engineering
+    "tech_arkship_tier_3",                  # Arkship Mastery
+    "tech_battleships",                     # Battleships
+    "tech_colossus",                        # Colossi
+    "tech_combat_computers_3",              # Sapient Combat Simulations
+    "tech_combat_computers_autonomous",     # Autonomous Ship Intellects
+    "tech_harbingers",                      # Harbingers
+    "tech_stingers",                        # Stingers
+    "tech_controlled_mutations_2",          # Advanced Controlled Mutations
+    "null_void_beam",                       # Null Void Beam
+    "tech_mandibles_2",                     # Composite Mandibles
+    "tech_mandibles_3",                     # Crystalline Mandibles
+    "tech_crystal_armor_1",                 # Crystal-Infused Plating
+    "tech_crystal_armor_2",                 # Crystal-Forged Plating
+    "tech_mine_betharian",                  # Betharian Refining
+    
+}
+
+ASCENSION_TRADITION_TREES = (
+    "cybernetics",
+    "synthetics",
+    "psionics",
+    "cloning",
+    "mutation",
+    "purity",
+    "modularity",
+    "nanotech",
+    "virtuality",
+)
+
+ECON_MILESTONES = [
+    ("tech", "Research / mo", [200, 300, 500, 1000, 3000], "/gfx/interface/icons/research_icon.dds"),
+    ("alloys", "Alloys / mo", [100, 200, 300, 500, 1000, 1500, 2000], "/gfx/interface/icons/resources/alloys.dds"),
+    ("unity", "Unity / mo", [100, 200, 300, 500, 1000, 1500, 2000], "/gfx/interface/icons/resources/unity.dds"),
+    ("trade", "Trade / mo", [500, 1000, 2000, 3000, 5000, 10000, 15000, 20000], "/gfx/interface/planetview/trade_value.dds"),
+]
+
 # Worker-level globals (initialized once per CPU core)
 WORKER_LOC_DICT = {}
 WORKER_PLAYER_PIDS = set()
 WORKER_COMP_ICONS = {}
+WORKER_BLOCKER_TYPES = set()
 
 
 def extract_block(text, start_index):
@@ -69,7 +175,7 @@ def extract_block(text, start_index):
 
 
 def strip_nested_blocks(blk):
-    """Returns only the top-level content inside a { ... } block so nested sub-blocks don't shadow top-level icon= properties."""
+    """Returns only the top-level content inside a { ... } block so nested sub-blocks don't shadow top-level properties."""
     if not blk or len(blk) < 2:
         return ""
     out = []
@@ -85,6 +191,52 @@ def strip_nested_blocks(blk):
         if depth == 1:
             out.append(ch)
     return "".join(out)
+
+
+def iter_anonymous_blocks(container_blk):
+    """Returns a list of direct child { ... } blocks inside a { ... } container."""
+    if not container_blk or len(container_blk) < 2:
+        return []
+    blocks = []
+    inner_end = len(container_blk) - 1
+    pos = 1
+    find = container_blk.find
+    while pos < inner_end:
+        open_idx = find('{', pos, inner_end)
+        if open_idx == -1:
+            break
+        blk = extract_block(container_blk, open_idx)
+        if not blk:
+            break
+        blocks.append(blk)
+        pos = open_idx + len(blk)
+    return blocks
+
+
+def get_direct_child_blocks(container_blk, target_keys=None):
+    """Extracts direct depth-1 `key={...}` blocks from a `{...}` block, immune to nested name collisions."""
+    result = defaultdict(list)
+    if not container_blk or len(container_blk) < 2:
+        return result
+    inner_end = len(container_blk) - 1
+    pos = 1
+    find = container_blk.find
+    while pos < inner_end:
+        open_idx = find('{', pos, inner_end)
+        if open_idx == -1:
+            break
+        blk = extract_block(container_blk, open_idx)
+        if not blk:
+            break
+        prefix_start = max(pos, open_idx - 80)
+        prefix = container_blk[prefix_start:open_idx]
+        m = TOP_KEY_BEFORE_BRACE.search(prefix)
+        if m:
+            key = m.group(1)
+            if target_keys is None or key in target_keys:
+                result[key].append(blk)
+        pos = open_idx + len(blk)
+    return result
 
 
 def get_top_level_blocks(container_text):
@@ -150,20 +302,63 @@ def load_stellaris_localization(game_folder):
     return loc_dict
 
 
+def load_blocker_types(game_folder):
+    """Scans common/deposits/*.txt to identify all clearable tile-blocker deposit keys."""
+    blocker_types = set()
+    deposits_dir = os.path.join(game_folder, "common", "deposits")
+    if not os.path.exists(deposits_dir):
+        return blocker_types
+
+    for root, _, files in os.walk(deposits_dir):
+        for f in files:
+            if not f.endswith(".txt"):
+                continue
+            try:
+                with open(os.path.join(root, f), 'r', encoding='utf-8', errors='ignore') as fp:
+                    content = re.sub(r'#.*', '', fp.read())
+                for key, blk in get_named_blocks(content):
+                    if key.startswith("@"):
+                        continue
+                    key_low = key.lower()
+                    if (
+                        "blocker" in key_low
+                        or key_low.startswith("tb_")
+                        or re.search(r'\bcategory\s*=\s*deposit_cat_blockers\b', blk)
+                        or re.search(r'\bdeposit_blockers\b', blk)
+                        or re.search(r'\bcan_be_cleared\s*=', blk)
+                        or re.search(r'\btime\s*=\s*\d+', strip_nested_blocks(blk))
+                    ):
+                        blocker_types.add(key)
+            except Exception:
+                pass
+    return blocker_types
+
+
+def is_blocker_deposit(dep_type, blocker_types):
+    if not dep_type:
+        return False
+    if dep_type in blocker_types:
+        return True
+    low = dep_type.lower()
+    return ("blocker" in low) or low.startswith("tb_")
+
+
 def build_game_catalog(game_folder):
     """
     Indexes .dds icons (prioritizing core gameplay folders over achievements)
     and parses interface/*.gfx, component_templates, buildings, districts, zones,
-    traditions, ascension perks, council agendas, traits, civics, origins, ethics, and technologies.
+    deposits, edicts, traditions, ascension perks, council agendas, traits,
+    civics, origins, ethics, and technologies.
     """
     dds_by_stem = {}
     dds_by_folder = defaultdict(dict)
     icons_root = os.path.join(game_folder, "gfx", "interface", "icons")
 
     priority_subfolders = [
-        "buildings", "districts", "zones", "traditions", "ascension_perks",
-        "agenda_icons", "technologies", "ship_parts", "traits", "governments",
-        "origins", "ethics", "resources"
+        "buildings", "districts", "zones", "deposits", "edicts",
+        "traditions", "ascension_perks", "agenda_icons", "technologies",
+        "ship_parts", "traits", "governments", "origins", "ethics",
+        "resources", "diplomacy"
     ]
     for sub in priority_subfolders:
         sub_path = os.path.join(icons_root, sub)
@@ -292,8 +487,9 @@ def build_game_catalog(game_folder):
     # 3. Seed entity_icons directly from core icon folders, then apply explicit .txt overrides
     entity_icons = {}
     for folder_name in (
-        "buildings", "districts", "zones", "traditions", "ascension_perks",
-        "agenda_icons", "origins", "governments", "ethics", "traits"
+        "buildings", "districts", "zones", "deposits", "edicts",
+        "traditions", "ascension_perks", "agenda_icons", "origins",
+        "governments", "ethics", "traits", "diplomacy"
     ):
         for stem, rel_path in dds_by_folder.get(folder_name, {}).items():
             if stem not in entity_icons:
@@ -306,6 +502,8 @@ def build_game_catalog(game_folder):
         ("buildings", os.path.join(game_folder, "common", "buildings")),
         ("districts", os.path.join(game_folder, "common", "districts")),
         ("zones", os.path.join(game_folder, "common", "zones")),
+        ("deposits", os.path.join(game_folder, "common", "deposits")),
+        ("edicts", os.path.join(game_folder, "common", "edicts")),
         ("traditions", os.path.join(game_folder, "common", "traditions")),
         ("traditions", os.path.join(game_folder, "common", "tradition_categories")),
         ("ascension_perks", os.path.join(game_folder, "common", "ascension_perks")),
@@ -337,6 +535,8 @@ def build_game_catalog(game_folder):
 
                         if icon_path:
                             entity_icons[key] = icon_path
+                            if pref_folder == "edicts":
+                                entity_icons[f"edict_{key}"] = icon_path
 
                         # Link tradition_categories adopt/finish keys to the tree's icon
                         if pref_folder == "traditions" and key.startswith("tradition_") and icon_path:
@@ -445,11 +645,42 @@ def clean_loc(key, loc_dict):
         return re.sub(r'§[A-Za-z!]', '', resolved).strip()
 
     cleaned = key
-    for prefix in ('trait_', 'civic_', 'origin_', 'ethic_', 'building_', 'district_', 'zone_', 'agenda_', 'tr_', 'tradition_', 'ap_', 'gov_', 'auth_', 'tech_'):
+    for prefix in (
+        'trait_', 'civic_', 'origin_', 'ethic_', 'building_', 'district_',
+        'zone_', 'agenda_', 'tr_', 'tradition_', 'ap_', 'gov_', 'auth_',
+        'tech_', 'edict_', 'policy_', 'd_', 'tb_', 'wg_'
+    ):
         if cleaned.startswith(prefix):
             cleaned = cleaned[len(prefix):]
             break
     return cleaned.replace('_', ' ').title()
+
+
+def clean_edict_loc(key, loc_dict):
+    if not key:
+        return "None"
+    for candidate in (f"edict_{key}", key, f"{key}_name"):
+        if candidate in loc_dict:
+            return clean_loc(candidate, loc_dict)
+    return clean_loc(key, loc_dict)
+
+
+def clean_policy_cat_loc(key, loc_dict):
+    if not key:
+        return "Policy"
+    for candidate in (f"policy_{key}", key):
+        if candidate in loc_dict:
+            return clean_loc(candidate, loc_dict)
+    return clean_loc(key, loc_dict)
+
+
+def clean_policy_opt_loc(key, loc_dict):
+    if not key:
+        return "None"
+    for candidate in (f"{key}_name", f"policy_option_{key}", key):
+        if candidate in loc_dict:
+            return clean_loc(candidate, loc_dict)
+    return clean_loc(key, loc_dict)
 
 
 def format_tradition_name(t_key, loc_dict):
@@ -464,6 +695,29 @@ def format_tradition_name(t_key, loc_dict):
         tree_name = clean_loc(tree_key, loc_dict) if tree_key in loc_dict else clean_loc(base, loc_dict)
         return f"Finished {tree_name} Tree"
     return clean_loc(t_key, loc_dict)
+
+
+def match_ascension_tradition(t_key, loc_dict):
+    """Returns (action, tree_label) if t_key opens or closes one of the 9 tracked ascension trees."""
+    if not t_key:
+        return None
+    low = t_key.lower()
+    if low.endswith("_adopt"):
+        action = "opened"
+        stem = low[:-6]
+    elif low.endswith("_finish"):
+        action = "finished"
+        stem = low[:-7]
+    else:
+        return None
+
+    tokens = set(stem.split("_"))
+    for tree in ASCENSION_TRADITION_TREES:
+        if tree in tokens:
+            tree_key = f"tradition_{tree}"
+            tree_label = clean_loc(tree_key, loc_dict) if tree_key in loc_dict else tree.title()
+            return action, tree_label
+    return None
 
 
 def extract_gamestate_head(file_or_dir_path, num_bytes=2000):
@@ -672,6 +926,26 @@ def parse_design_details(d_blk, loc_dict, comp_icons):
     }
 
 
+def get_major_block(gamestate, block_name):
+    match = re.search(rf'(?:^|\n){block_name}\s*=\s*\{{', gamestate)
+    if match:
+        return extract_block(gamestate, match.end() - 1)
+    return ""
+
+
+def extract_human_player_ids(gamestate_string):
+    """Returns country IDs controlled by human players in the top-level player={...} block."""
+    human_ids = set()
+    player_block = get_major_block(gamestate_string, "player")
+    if player_block:
+        for cid in re.findall(r'\bcountry\s*=\s*(\d+)', player_block):
+            human_ids.add(cid)
+    else:
+        for _, cid in re.findall(r'name="([^"]+)"\s*country=(\d+)', gamestate_string):
+            human_ids.add(cid)
+    return human_ids
+
+
 def extract_player_names(gamestate_string):
     player_map = {}
     for name, country_id in re.compile(r'name="([^"]+)"\s*country=(\d+)').findall(gamestate_string):
@@ -697,13 +971,6 @@ def extract_player_names(gamestate_string):
             if match and match.group(1) not in player_map:
                 player_map[match.group(1)] = f"Defeated Player {match.group(1)}"
     return player_map
-
-
-def get_major_block(gamestate, block_name):
-    match = re.search(rf'\n{block_name}\s*=\s*\{{', gamestate)
-    if match:
-        return extract_block(gamestate, match.end() - 1)
-    return ""
 
 
 def extract_country_resources(p_data, res_keys):
@@ -746,8 +1013,73 @@ def extract_country_resources(p_data, res_keys):
     return resources
 
 
+def parse_relations_manager(rm_blk):
+    """Parses bilateral treaties from a country's relations_manager={...} block."""
+    pacts = {
+        "defensive_pact": set(),
+        "non_aggression_pledge": set(),
+        "research_agreement": set(),
+        "commercial_pact": set(),
+        "migration_access": set(),
+    }
+    if not rm_blk:
+        return pacts
+
+    rel_entries = []
+    pos = 1
+    while pos < len(rm_blk):
+        m = re.search(r'\brelation\s*=\s*\{', rm_blk[pos:])
+        if not m:
+            break
+        open_idx = pos + m.end() - 1
+        rel_blk = extract_block(rm_blk, open_idx)
+        if not rel_blk:
+            break
+        pos = open_idx + len(rel_blk)
+
+        top_rel = strip_nested_blocks(rel_blk)
+        if re.search(r'\bcountry\s*=\s*\d+', top_rel):
+            rel_entries.append(rel_blk)
+        else:
+            rel_entries.extend(iter_anonymous_blocks(rel_blk))
+
+    for entry in rel_entries:
+        top_entry = strip_nested_blocks(entry)
+        c_m = re.search(r'\bcountry\s*=\s*(\d+)', top_entry)
+        if not c_m:
+            continue
+        target_cid = c_m.group(1)
+        if re.search(r'\bdefensive_pact\s*=\s*yes\b', top_entry):
+            pacts["defensive_pact"].add(target_cid)
+        if re.search(r'\bnon_aggression_pledge\s*=\s*yes\b', top_entry):
+            pacts["non_aggression_pledge"].add(target_cid)
+        if re.search(r'\bresearch_agreement\s*=\s*yes\b', top_entry):
+            pacts["research_agreement"].add(target_cid)
+        if re.search(r'\bcommercial_pact\s*=\s*yes\b', top_entry):
+            pacts["commercial_pact"].add(target_cid)
+        if re.search(r'\bmigration_access\s*=\s*yes\b', top_entry):
+            pacts["migration_access"].add(target_cid)
+
+    return pacts
+
+
 def extract_empire_progression(p_data):
-    """Extracts government, ethics, civics, agendas, traditions, ascension perks, and researched technologies."""
+    """
+    Extracts government, ethics, civics, agendas, traditions, ascension perks,
+    technologies, active edicts, active policies, bilateral pacts, capital, and country type.
+    """
+    top_p = strip_nested_blocks(p_data)
+    children = get_direct_child_blocks(p_data, {
+        "ethos", "government", "timed_modifier", "traditions",
+        "ascension_perks", "tech_status", "edicts", "active_policies",
+        "relations_manager"
+    })
+
+    cap_m = re.search(r'\bcapital\s*=\s*(\d+)', top_p)
+    capital = cap_m.group(1) if cap_m else None
+    type_m = re.search(r'\btype\s*=\s*"?([^"\s\}]+)"?', top_p)
+    country_type = type_m.group(1) if type_m else ""
+
     gov_type = ""
     authority = ""
     origin = ""
@@ -757,14 +1089,11 @@ def extract_empire_progression(p_data):
     council_agenda_progress = 0.0
     cooldown_agendas = []
 
-    ethos_m = re.search(r'\bethos\s*=\s*\{', p_data)
-    if ethos_m:
-        ethos_blk = extract_block(p_data, ethos_m.end() - 1)
-        ethics = re.findall(r'"(ethic_[^"]+)"', ethos_blk)
+    if children["ethos"]:
+        ethics = re.findall(r'"(ethic_[^"]+)"', children["ethos"][0])
 
-    gov_m = re.search(r'\bgovernment\s*=\s*\{', p_data)
-    if gov_m:
-        gov_blk = extract_block(p_data, gov_m.end() - 1)
+    if children["government"]:
+        gov_blk = children["government"][0]
         gt_m = re.search(r'\btype\s*=\s*"?([^"\s\}]+)"?', gov_blk)
         au_m = re.search(r'\bauthority\s*=\s*"?([^"\s\}]+)"?', gov_blk)
         or_m = re.search(r'\borigin\s*=\s*"?([^"\s\}]+)"?', gov_blk)
@@ -791,29 +1120,57 @@ def extract_empire_progression(p_data):
             council_agenda_progress = float(cap_m.group(1))
 
     finish_modifiers = []
-    tm_m = re.search(r'\btimed_modifier\s*=\s*\{', p_data)
-    if tm_m:
-        tm_blk = extract_block(p_data, tm_m.end() - 1)
-        finish_modifiers = re.findall(r'\bmodifier\s*=\s*"(agenda_[^"]+_finish)"', tm_blk)
+    for tm_blk in children["timed_modifier"]:
+        finish_modifiers.extend(re.findall(r'\bmodifier\s*=\s*"(agenda_[^"]+_finish)"', tm_blk))
 
     traditions = []
-    trad_m = re.search(r'\btraditions\s*=\s*\{([^\}]*)\}', p_data)
-    if trad_m:
-        traditions = re.findall(r'"([^"]+)"', trad_m.group(1))
+    if children["traditions"]:
+        traditions = re.findall(r'"([^"]+)"', children["traditions"][0])
 
     ascension_perks = []
-    ap_m = re.search(r'\bascension_perks\s*=\s*\{([^\}]*)\}', p_data)
-    if ap_m:
-        ascension_perks = re.findall(r'"([^"]+)"', ap_m.group(1))
+    if children["ascension_perks"]:
+        ascension_perks = re.findall(r'"([^"]+)"', children["ascension_perks"][0])
 
     techs = []
-    ts_m = re.search(r'\btech_status\s*=\s*\{', p_data)
-    if ts_m:
-        ts_blk = extract_block(p_data, ts_m.end() - 1)
+    if children["tech_status"]:
+        ts_blk = children["tech_status"][0]
         for tm in re.finditer(r'\btechnology\s*=\s*"([^"]+)"\s+level\s*=\s*(\d+)', ts_blk):
             techs.append((tm.group(1), int(tm.group(2))))
 
+    # Active Edicts (top-level country edicts block only, never budget.expenses.edicts)
+    edicts = []
+    if children["edicts"]:
+        ed_blk = children["edicts"][0]
+        ed_entries = iter_anonymous_blocks(ed_blk)
+        if ed_entries:
+            for e_entry in ed_entries:
+                em = re.search(r'\bedict\s*=\s*"([^"]+)"', e_entry)
+                if em:
+                    edicts.append(em.group(1))
+        else:
+            edicts = re.findall(r'\bedict\s*=\s*"([^"]+)"', ed_blk)
+
+    # Active Policies
+    policies = {}
+    if children["active_policies"]:
+        pol_blk = children["active_policies"][0]
+        pol_entries = iter_anonymous_blocks(pol_blk)
+        if pol_entries:
+            for p_entry in pol_entries:
+                pm = re.search(r'\bpolicy\s*=\s*"([^"]+)"', p_entry)
+                sm = re.search(r'\bselected\s*=\s*"([^"]+)"', p_entry)
+                if pm and sm:
+                    policies[pm.group(1)] = sm.group(1)
+        else:
+            for pm in re.finditer(r'\bpolicy\s*=\s*"([^"]+)"\s+selected\s*=\s*"([^"]+)"', pol_blk):
+                policies[pm.group(1)] = pm.group(2)
+
+    # Bilateral Diplomatic Pacts
+    pacts = parse_relations_manager(children["relations_manager"][0] if children["relations_manager"] else "")
+
     return {
+        "capital": capital,
+        "country_type": country_type,
         "gov_type": gov_type,
         "authority": authority,
         "origin": origin,
@@ -825,8 +1182,101 @@ def extract_empire_progression(p_data):
         "finish_modifiers": finish_modifiers,
         "traditions": traditions,
         "ascension_perks": ascension_perks,
-        "techs": techs
+        "techs": techs,
+        "edicts": edicts,
+        "policies": policies,
+        "pacts": {k: sorted(list(v)) for k, v in pacts.items()}
     }
+
+
+def extract_federations(gamestate, loc_dict):
+    """Extracts active federations from top-level federation={...} block."""
+    federations = {}
+    fed_block = get_major_block(gamestate, "federation")
+    if not fed_block:
+        return federations
+
+    for fed_id, f_blk in get_top_level_blocks(fed_block).items():
+        f_children = get_direct_child_blocks(f_blk, {"members", "federation_progression"})
+        members = re.findall(r'\d+', f_children["members"][0]) if f_children["members"] else []
+        if not members:
+            continue
+        top_f = strip_nested_blocks(f_blk)
+        leader_m = re.search(r'\bleader\s*=\s*(\d+)', top_f)
+        start_m = re.search(r'\bstart_date\s*=\s*"([\d\.]+)"', top_f)
+
+        fed_type_raw = ""
+        if f_children["federation_progression"]:
+            ft_m = re.search(r'\bfederation_type\s*=\s*"([^"]+)"', f_children["federation_progression"][0])
+            if ft_m:
+                fed_type_raw = ft_m.group(1)
+
+        federations[fed_id] = {
+            "id": fed_id,
+            "name": resolve_saved_name(f_blk, loc_dict, f"Federation {fed_id}"),
+            "type_key": fed_type_raw,
+            "type": clean_loc(fed_type_raw, loc_dict) if fed_type_raw else "Federation",
+            "leader": leader_m.group(1) if leader_m else "",
+            "members": members,
+            "start_date": start_m.group(1) if start_m else ""
+        }
+    return federations
+
+
+def extract_wars(gamestate, loc_dict):
+    """Extracts active wars from top-level war={...} block."""
+    wars = {}
+    war_block = get_major_block(gamestate, "war")
+    if not war_block:
+        return wars
+
+    def parse_side(side_blk):
+        all_cids = []
+        primary_cids = []
+        for entry in iter_anonymous_blocks(side_blk):
+            cm = re.search(r'\bcountry\s*=\s*(\d+)', entry)
+            if not cm:
+                continue
+            cid = cm.group(1)
+            all_cids.append(cid)
+            if re.search(r'\bcall_type\s*=\s*primary\b', entry):
+                primary_cids.append(cid)
+        return all_cids, (primary_cids or all_cids[:1])
+
+    for war_id, w_blk in get_top_level_blocks(war_block).items():
+        w_children = get_direct_child_blocks(w_blk, {
+            "attackers", "defenders", "attacker_war_goal", "defender_war_goal"
+        })
+        attackers, primary_attackers = parse_side(w_children["attackers"][0]) if w_children["attackers"] else ([], [])
+        defenders, primary_defenders = parse_side(w_children["defenders"][0]) if w_children["defenders"] else ([], [])
+        if not attackers and not defenders:
+            continue
+
+        top_w = strip_nested_blocks(w_blk)
+        start_m = re.search(r'\bstart_date\s*=\s*"([\d\.]+)"', top_w)
+        att_wg = ""
+        if w_children["attacker_war_goal"]:
+            m = re.search(r'\btype\s*=\s*"([^"]+)"', w_children["attacker_war_goal"][0])
+            if m:
+                att_wg = clean_loc(m.group(1), loc_dict)
+        def_wg = ""
+        if w_children["defender_war_goal"]:
+            m = re.search(r'\btype\s*=\s*"([^"]+)"', w_children["defender_war_goal"][0])
+            if m:
+                def_wg = clean_loc(m.group(1), loc_dict)
+
+        wars[war_id] = {
+            "id": war_id,
+            "name": resolve_saved_name(w_blk, loc_dict, f"War #{war_id}"),
+            "start_date": start_m.group(1) if start_m else "",
+            "attackers": attackers,
+            "defenders": defenders,
+            "primary_attackers": primary_attackers,
+            "primary_defenders": primary_defenders,
+            "attacker_war_goal": att_wg,
+            "defender_war_goal": def_wg
+        }
+    return wars
 
 
 def select_closest_neighbors(start_id, adjacency_list, neighbor_limit, avoid_systems=None):
@@ -1031,11 +1481,12 @@ def extract_galaxy_map_data(gamestate, loc_dict, player_map):
     }
 
 
-def init_worker(loc_dict, player_pids, comp_icons):
-    global WORKER_LOC_DICT, WORKER_PLAYER_PIDS, WORKER_COMP_ICONS
+def init_worker(loc_dict, player_pids, comp_icons, blocker_types=None):
+    global WORKER_LOC_DICT, WORKER_PLAYER_PIDS, WORKER_COMP_ICONS, WORKER_BLOCKER_TYPES
     WORKER_LOC_DICT = loc_dict
     WORKER_PLAYER_PIDS = set(player_pids)
     WORKER_COMP_ICONS = comp_icons
+    WORKER_BLOCKER_TYPES = set(blocker_types) if blocker_types else set()
 
 
 def process_single_save(task):
@@ -1043,8 +1494,10 @@ def process_single_save(task):
     loc_dict = WORKER_LOC_DICT
     player_pids = WORKER_PLAYER_PIDS
     comp_icons = WORKER_COMP_ICONS
+    blocker_types = WORKER_BLOCKER_TYPES
 
     gamestate = extract_gamestate_content(filepath)
+    save_human_pids = list(extract_human_player_ids(gamestate))
 
     # 1. Extract Country Blocks FIRST
     country_block = get_major_block(gamestate, "country")
@@ -1213,11 +1666,33 @@ def process_single_save(task):
             "templates": list(design_groups.values())
         }
 
-    # 7. Assemble Player Stats & Progression Snapshots (including eliminated empires)
+    # 7. Extract Federations & Wars
+    federations = extract_federations(gamestate, loc_dict)
+    wars = extract_wars(gamestate, loc_dict)
+
+    # 8. Assemble Player Stats & Progression Snapshots (including eliminated empires)
     player_stats = {}
     player_progression = {}
     empire_names = {}
+    player_capitals = {}
+    country_types = {}
     zero_resources = {rk: {"stockpile": 0.0, "balance": 0.0} for rk in RES_KEYS}
+    empty_diplomacy = {
+        "federation": None,
+        "wars": [],
+        "defensive_pacts": [],
+        "non_aggression_pacts": [],
+        "research_agreements": [],
+        "commercial_pacts": [],
+        "migration_treaties": []
+    }
+
+    referenced_country_ids = set()
+    for fed in federations.values():
+        referenced_country_ids.update(fed["members"])
+    for w in wars.values():
+        referenced_country_ids.update(w["attackers"])
+        referenced_country_ids.update(w["defenders"])
 
     for pid in player_pids:
         p_data = player_country_blocks.get(pid)
@@ -1238,6 +1713,9 @@ def process_single_save(task):
                 "active_agenda": "None",
                 "agenda_progress": 0.0,
                 "traits": [],
+                "edicts": [],
+                "policies": [],
+                "diplomacy": dict(empty_diplomacy),
                 "resources": zero_resources,
                 "fleets": []
             }
@@ -1258,6 +1736,13 @@ def process_single_save(task):
 
         prog = extract_empire_progression(p_data)
         player_progression[pid] = prog
+        if prog["capital"]:
+            player_capitals[pid] = prog["capital"]
+        if prog["country_type"]:
+            country_types[pid] = prog["country_type"]
+
+        for p_list in prog["pacts"].values():
+            referenced_country_ids.update(p_list)
 
         origin_clean = clean_loc(prog["origin"], loc_dict) if prog["origin"] else "None"
         ethics_clean = [clean_loc(e, loc_dict) for e in prog["ethics"]]
@@ -1265,6 +1750,16 @@ def process_single_save(task):
         gov_clean = clean_loc(prog["gov_type"], loc_dict) if prog["gov_type"] else ""
         auth_clean = clean_loc(prog["authority"], loc_dict) if prog["authority"] else ""
         active_agenda_clean = clean_loc(prog["council_agenda"], loc_dict) if prog["council_agenda"] else "None"
+        edicts_clean = [clean_edict_loc(ed, loc_dict) for ed in prog["edicts"]]
+        policies_clean = [
+            {
+                "policy": clean_policy_cat_loc(pk, loc_dict),
+                "selected": clean_policy_opt_loc(sk, loc_dict),
+                "policy_key": pk,
+                "key": sk
+            }
+            for pk, sk in prog["policies"].items()
+        ]
 
         traits = []
         sp_id_m = re.search(r'founder_species_ref\s*=\s*(\d+)', p_data)
@@ -1292,6 +1787,7 @@ def process_single_save(task):
             "owned_planets": display_planets if is_alive else 0,
             "legal_planets": owned_planets_count,
             "controlled_planets": controlled_planets_count,
+            "capital_planet": prog["capital"],
             "government": gov_clean if is_alive else "Eliminated",
             "authority": auth_clean,
             "origin": origin_clean,
@@ -1300,11 +1796,25 @@ def process_single_save(task):
             "active_agenda": active_agenda_clean,
             "agenda_progress": prog["council_agenda_progress"],
             "traits": traits,
+            "edicts": edicts_clean if is_alive else [],
+            "policies": policies_clean if is_alive else [],
+            "diplomacy": dict(empty_diplomacy),
             "resources": resources if is_alive else zero_resources,
             "fleets": owned_fleets_data if is_alive else []
         }
 
-    # 8. Extract Planets & Raw Queue Items (with Star System coordinate fallback for Habitats)
+    # Resolve names for any non-player diplomatic partners (AI empires, FEs, etc.)
+    extra_country_names = {}
+    for cid in referenced_country_ids:
+        if cid in empire_names:
+            continue
+        c_blk = country_top_blocks.get(cid)
+        if c_blk:
+            cname = resolve_saved_name(c_blk, loc_dict, None)
+            if cname:
+                extra_country_names[cid] = cname
+
+    # 9. Extract Planets, Blockers, Controllers & Raw Queue Items
     system_names = {}
     gal_obj_block = get_major_block(gamestate, "galactic_object")
     if gal_obj_block:
@@ -1313,20 +1823,57 @@ def process_single_save(task):
 
     colony_map = {}
     new_owners = {}
+    new_controllers = {}
     planet_names = {}
+    planet_deposit_ids = {}
+    needed_deposit_ids = set()
+
     planets_block = get_major_block(gamestate, "planets")
     if planets_block:
         for p_id, p_block_str in get_top_level_blocks(planets_block).items():
             colony_match = re.search(r'\bcolony\s*=\s*(\d+)', p_block_str)
             owner_match = re.search(r'\bowner\s*=\s*(\d+)', p_block_str)
+            ctrl_match = re.search(r'\bcontroller\s*=\s*(\d+)', p_block_str)
+
             if colony_match:
                 colony_map[colony_match.group(1)] = p_id
             if owner_match:
-                new_owners[p_id] = owner_match.group(1)
+                owner_id = owner_match.group(1)
+                new_owners[p_id] = owner_id
+                ctrl_id = ctrl_match.group(1) if ctrl_match else owner_id
+                new_controllers[p_id] = ctrl_id
+
+                if owner_id in player_pids:
+                    dep_m = re.search(r'\bdeposits\s*=\s*\{([^\}]*)\}', p_block_str)
+                    dep_ids = re.findall(r'\d+', dep_m.group(1)) if dep_m else []
+                    planet_deposit_ids[p_id] = dep_ids
+                    needed_deposit_ids.update(dep_ids)
 
             name_val = resolve_saved_name(p_block_str, loc_dict, "Unknown Planet", system_names)
             if name_val != "Unknown Planet":
                 planet_names[p_id] = name_val
+
+    # Resolve blocker deposits for player-owned planets
+    deposit_types = {}
+    if needed_deposit_ids:
+        deposit_block = get_major_block(gamestate, "deposit")
+        if deposit_block:
+            for dep_id, dep_blk in get_top_level_blocks(deposit_block).items():
+                if dep_id not in needed_deposit_ids:
+                    continue
+                t_m = re.search(r'\btype\s*=\s*"([^"]+)"', dep_blk)
+                if t_m:
+                    dep_type = t_m.group(1)
+                    if is_blocker_deposit(dep_type, blocker_types):
+                        deposit_types[dep_id] = dep_type
+
+    planet_blockers = {}
+    for p_id, dep_ids in planet_deposit_ids.items():
+        planet_blockers[p_id] = {
+            dep_id: deposit_types[dep_id]
+            for dep_id in dep_ids
+            if dep_id in deposit_types
+        }
 
     raw_queue_items = []
     for match in ITEM_PATTERN.finditer(gamestate):
@@ -1336,14 +1883,952 @@ def process_single_save(task):
     return {
         "index": index,
         "date": date,
+        "save_human_pids": save_human_pids,
         "player_stats": player_stats,
         "player_progression": player_progression,
+        "player_capitals": player_capitals,
+        "country_types": country_types,
         "empire_names": empire_names,
+        "extra_country_names": extra_country_names,
+        "federations": federations,
+        "wars": wars,
         "colony_map": colony_map,
         "new_owners": new_owners,
+        "new_controllers": new_controllers,
         "planet_names": planet_names,
+        "planet_blockers": planet_blockers,
         "raw_queue_items": raw_queue_items
     }
+
+
+def _format_power(val):
+    if val >= 1_000_000:
+        return f"{val / 1_000_000:.2f}M"
+    if val >= 1_000:
+        return f"{val / 1_000:.1f}k"
+    return f"{val:.0f}"
+
+
+def reconcile_timeline_results(
+    campaign_name,
+    player_map,
+    results,
+    loc_dict,
+    tech_catalog,
+    ui_icon_map,
+    galaxy_map=None,
+    human_pids=None,
+    include_last_updated=False
+):
+    """
+    Shared chronological reconciliation pass for both batch extraction and live autosaver.
+    Reconciles build orders, blocker removals, edicts, policies, diplomacy, technologies,
+    empire progression, and color-coded Live Notifications (preserving galaxy-wide 'firsts'
+    and cross-save comparisons such as fleet dips and deficits).
+    """
+    all_human_pids = set(human_pids) if human_pids else set()
+    default_type_pids = set()
+    known_country_names = dict(player_map)
+
+    for res in results:
+        if not res:
+            continue
+        all_human_pids.update(res.get("save_human_pids", []))
+        for cid, ctype in res.get("country_types", {}).items():
+            if ctype == "default":
+                default_type_pids.add(cid)
+        for cid, cname in res.get("extra_country_names", {}).items():
+            if cid not in known_country_names or known_country_names[cid].startswith("Ai Empire"):
+                known_country_names[cid] = cname
+
+    # Prefer actual human players for galaxy-firsts & alerts so Fallen Empires/Marauders never steal milestones
+    if all_human_pids:
+        alert_pids = all_human_pids
+    elif default_type_pids:
+        alert_pids = default_type_pids
+    else:
+        alert_pids = {
+            pid for pid, pname in player_map.items()
+            if not pname.startswith("Ai Empire") and not pname.startswith("Defeated Player")
+        }
+
+    def display_name(cid):
+        return known_country_names.get(cid, f"Empire #{cid}")
+
+    timeline_data = {
+        "campaign_name": campaign_name,
+        "icons": ui_icon_map,
+        "galaxy_map": galaxy_map or {},
+        "notifications": [],
+        "players": {}
+    }
+    if include_last_updated:
+        timeline_data["last_updated"] = time.time()
+
+    for pid, pname in player_map.items():
+        timeline_data["players"][pid] = {
+            "name": pname,
+            "empire_name": pname,
+            "is_human": pid in alert_pids,
+            "stats_history": [],
+            "empire_events": [],
+            "tech_events": [],
+            "planets": {}
+        }
+
+    build_orders = defaultdict(lambda: defaultdict(list))
+    seen_construction_ids = set()
+    planet_current_owners = {}
+    planet_current_controllers = {}
+    planet_prev_blockers = {}  # planet_id -> (owner_id, {dep_id: dep_type})
+    master_colony_map = {}
+    master_planet_names = {}
+
+    player_state = {}
+    player_known_capitals = {}
+    prev_fleet_power = {}
+    active_deficits = defaultdict(set)
+    empire_events = defaultdict(list)
+    tech_events = defaultdict(list)
+
+    # Cross-save diplomacy state
+    active_wars = {}
+    active_feds = {}
+    active_dp_pairs = set()
+    active_nap_pairs = set()
+
+    # Galaxy-wide & per-player milestone memory
+    first_techs_claimed = set()
+    first_milestones_claimed = set()
+    player_milestones_claimed = defaultdict(set)
+    notifications = []
+    notif_seq = 0
+
+    def add_notification(date_str, n_type, category, color, title, message, players=None, icon="", is_first=False):
+        nonlocal notif_seq
+        notif_seq += 1
+        notifications.append({
+            "id": f"n_{notif_seq}",
+            "date": date_str,
+            "type": n_type,
+            "category": category,
+            "color": color,
+            "title": title,
+            "message": message,
+            "players": list(players) if players else [],
+            "icon": icon,
+            "is_first": is_first
+        })
+
+    def make_tech_event(date_str, t_key, level, is_starting):
+        t_meta = tech_catalog.get(t_key, {
+            "area": "physics",
+            "tier": 1,
+            "icon": "/gfx/interface/icons/research_icon.dds"
+        })
+        base_name = clean_loc(t_key, loc_dict)
+        if level > 1:
+            base_name = f"{base_name} (Level {level})"
+        return {
+            "date": date_str,
+            "key": t_key,
+            "name": base_name,
+            "area": t_meta["area"],
+            "tier": t_meta["tier"],
+            "icon": t_meta["icon"],
+            "starting": is_starting
+        }
+
+    for save_idx, res in enumerate(results):
+        if not res:
+            continue
+        date = res["date"]
+        is_initial_save = (save_idx == 0)
+
+        master_colony_map.update(res.get("colony_map", {}))
+        master_planet_names.update(res.get("planet_names", {}))
+
+        # Populate per-save diplomacy snapshot on player_stats before appending
+        curr_feds = res.get("federations", {})
+        curr_wars = res.get("wars", {})
+
+        fed_by_member = {}
+        for fed_id, f_obj in curr_feds.items():
+            member_names = [display_name(m) for m in f_obj["members"]]
+            leader_name = display_name(f_obj["leader"]) if f_obj["leader"] else ""
+            for m in f_obj["members"]:
+                fed_by_member[m] = {
+                    "id": fed_id,
+                    "name": f_obj["name"],
+                    "type": f_obj["type"],
+                    "leader": leader_name,
+                    "is_leader": (m == f_obj["leader"]),
+                    "members": member_names
+                }
+
+        wars_by_member = defaultdict(list)
+        for war_id, w_obj in curr_wars.items():
+            att_names = [display_name(c) for c in w_obj["attackers"]]
+            def_names = [display_name(c) for c in w_obj["defenders"]]
+            for c in w_obj["attackers"]:
+                wars_by_member[c].append({
+                    "id": war_id,
+                    "name": w_obj["name"],
+                    "role": "Attacker",
+                    "opponents": def_names,
+                    "war_goal": w_obj["attacker_war_goal"]
+                })
+            for c in w_obj["defenders"]:
+                wars_by_member[c].append({
+                    "id": war_id,
+                    "name": w_obj["name"],
+                    "role": "Defender",
+                    "opponents": att_names,
+                    "war_goal": w_obj["defender_war_goal"]
+                })
+
+        for pid, stat_obj in res["player_stats"].items():
+            if pid not in timeline_data["players"]:
+                continue
+            stat_copy = dict(stat_obj)
+            prog_for_pid = res["player_progression"].get(pid)
+            if stat_copy.get("alive", False) and prog_for_pid:
+                pacts_raw = prog_for_pid.get("pacts", {})
+                stat_copy["diplomacy"] = {
+                    "federation": fed_by_member.get(pid),
+                    "wars": wars_by_member.get(pid, []),
+                    "defensive_pacts": sorted([display_name(c) for c in pacts_raw.get("defensive_pact", [])]),
+                    "non_aggression_pacts": sorted([display_name(c) for c in pacts_raw.get("non_aggression_pledge", [])]),
+                    "research_agreements": sorted([display_name(c) for c in pacts_raw.get("research_agreement", [])]),
+                    "commercial_pacts": sorted([display_name(c) for c in pacts_raw.get("commercial_pact", [])]),
+                    "migration_treaties": sorted([display_name(c) for c in pacts_raw.get("migration_access", [])])
+                }
+            else:
+                stat_copy["diplomacy"] = {
+                    "federation": None,
+                    "wars": [],
+                    "defensive_pacts": [],
+                    "non_aggression_pacts": [],
+                    "research_agreements": [],
+                    "commercial_pacts": [],
+                    "migration_treaties": []
+                }
+            timeline_data["players"][pid]["stats_history"].append(stat_copy)
+
+        for pid, emp_name in res["empire_names"].items():
+            if emp_name and pid in timeline_data["players"]:
+                timeline_data["players"][pid]["empire_name"] = emp_name
+
+        # --- 1. RECONCILE WARS ---
+        relevant_curr_wars = {
+            wid: w for wid, w in curr_wars.items()
+            if any(c in alert_pids for c in w["attackers"] + w["defenders"])
+        }
+        if is_initial_save:
+            active_wars = dict(relevant_curr_wars)
+        else:
+            for wid, w in relevant_curr_wars.items():
+                if wid not in active_wars:
+                    att_str = ", ".join(display_name(c) for c in w["primary_attackers"])
+                    def_str = ", ".join(display_name(c) for c in w["primary_defenders"])
+                    wg_suffix = f" ({w['attacker_war_goal']})" if w["attacker_war_goal"] else ""
+                    msg = f"{att_str} declared war on {def_str} — {w['name']}{wg_suffix}"
+                    involved_players = [c for c in w["attackers"] + w["defenders"] if c in timeline_data["players"]]
+                    add_notification(
+                        date, "WAR_STARTED", "diplomacy", "red", "War Started", msg,
+                        players=involved_players,
+                        icon="/gfx/interface/icons/diplomacy/diplomacy_war.dds"
+                    )
+                    for c in w["attackers"]:
+                        if c in timeline_data["players"]:
+                            empire_events[c].append({
+                                "date": date,
+                                "type": "WAR_STARTED",
+                                "item": f"Declared War on {def_str} ({w['name']})",
+                                "key": "diplomacy_war"
+                            })
+                    for c in w["defenders"]:
+                        if c in timeline_data["players"]:
+                            empire_events[c].append({
+                                "date": date,
+                                "type": "WAR_STARTED",
+                                "item": f"Attacked by {att_str} ({w['name']})",
+                                "key": "diplomacy_war"
+                            })
+
+            for wid, w in active_wars.items():
+                if wid not in relevant_curr_wars:
+                    att_str = ", ".join(display_name(c) for c in w["primary_attackers"])
+                    def_str = ", ".join(display_name(c) for c in w["primary_defenders"])
+                    msg = f"War ended: {w['name']} ({att_str} vs {def_str})"
+                    involved_players = [c for c in w["attackers"] + w["defenders"] if c in timeline_data["players"]]
+                    add_notification(
+                        date, "WAR_ENDED", "diplomacy", "red", "War Ended", msg,
+                        players=involved_players,
+                        icon="/gfx/interface/icons/diplomacy/diplomacy_truce.dds"
+                    )
+                    for c in involved_players:
+                        empire_events[c].append({
+                            "date": date,
+                            "type": "WAR_ENDED",
+                            "item": f"War Ended: {w['name']}",
+                            "key": "diplomacy_truce"
+                        })
+            active_wars = dict(relevant_curr_wars)
+
+        # --- 2. RECONCILE FEDERATIONS ---
+        relevant_curr_feds = {
+            fid: f for fid, f in curr_feds.items()
+            if any(m in alert_pids for m in f["members"])
+        }
+        if is_initial_save:
+            active_feds = dict(relevant_curr_feds)
+        else:
+            for fid, f in relevant_curr_feds.items():
+                if fid not in active_feds:
+                    members_str = ", ".join(display_name(m) for m in f["members"])
+                    msg = f"{f['name']} ({f['type']}) formed by {members_str}"
+                    involved_players = [m for m in f["members"] if m in timeline_data["players"]]
+                    add_notification(
+                        date, "FEDERATION_FORMED", "diplomacy", "red", "Federation Formed", msg,
+                        players=involved_players,
+                        icon="/gfx/interface/icons/diplomacy/diplomacy_federation.dds"
+                    )
+                    for m in involved_players:
+                        empire_events[m].append({
+                            "date": date,
+                            "type": "FEDERATION_FORMED",
+                            "item": f"Formed {f['name']} ({f['type']}) with {members_str}",
+                            "key": "diplomacy_federation"
+                        })
+                else:
+                    old_members = set(active_feds[fid]["members"])
+                    new_members = set(f["members"])
+                    for m in sorted(new_members - old_members):
+                        if m in timeline_data["players"]:
+                            empire_events[m].append({
+                                "date": date,
+                                "type": "FEDERATION_JOINED",
+                                "item": f"Joined {f['name']} ({f['type']})",
+                                "key": "diplomacy_federation"
+                            })
+                    for m in sorted(old_members - new_members):
+                        if m in timeline_data["players"]:
+                            empire_events[m].append({
+                                "date": date,
+                                "type": "FEDERATION_LEFT",
+                                "item": f"Left {f['name']}",
+                                "key": "diplomacy_federation"
+                            })
+
+            for fid, f in active_feds.items():
+                if fid not in relevant_curr_feds:
+                    members_str = ", ".join(display_name(m) for m in f["members"])
+                    msg = f"{f['name']} disbanded (former members: {members_str})"
+                    involved_players = [m for m in f["members"] if m in timeline_data["players"]]
+                    add_notification(
+                        date, "FEDERATION_DISBANDED", "diplomacy", "red", "Federation Disbanded", msg,
+                        players=involved_players,
+                        icon="/gfx/interface/icons/diplomacy/diplomacy_federation.dds"
+                    )
+                    for m in involved_players:
+                        empire_events[m].append({
+                            "date": date,
+                            "type": "FEDERATION_DISBANDED",
+                            "item": f"{f['name']} Disbanded",
+                            "key": "diplomacy_federation"
+                        })
+            active_feds = dict(relevant_curr_feds)
+
+        # --- 3. RECONCILE BILATERAL PACTS (DEFENSIVE & NON-AGGRESSION) ---
+        curr_dp_pairs = set()
+        curr_nap_pairs = set()
+        for pid, prog in res["player_progression"].items():
+            stat_obj = res["player_stats"].get(pid)
+            if not stat_obj or not stat_obj.get("alive", False):
+                continue
+            pacts = prog.get("pacts", {})
+            for partner in pacts.get("defensive_pact", []):
+                if pid in alert_pids or partner in alert_pids:
+                    curr_dp_pairs.add(tuple(sorted((pid, partner))))
+            for partner in pacts.get("non_aggression_pledge", []):
+                if pid in alert_pids or partner in alert_pids:
+                    curr_nap_pairs.add(tuple(sorted((pid, partner))))
+
+        if is_initial_save:
+            active_dp_pairs = set(curr_dp_pairs)
+            active_nap_pairs = set(curr_nap_pairs)
+        else:
+            for a, b in sorted(curr_dp_pairs - active_dp_pairs):
+                msg = f"{display_name(a)} & {display_name(b)} formed a Defensive Pact"
+                add_notification(
+                    date, "DEFENSIVE_PACT_FORMED", "diplomacy", "purple", "Defensive Pact Formed", msg,
+                    players=[c for c in (a, b) if c in timeline_data["players"]],
+                    icon="/gfx/interface/icons/diplomacy/diplomacy_defensive_pact.dds"
+                )
+                if a in timeline_data["players"]:
+                    empire_events[a].append({
+                        "date": date, "type": "DEFENSIVE_PACT_FORMED",
+                        "item": f"Defensive Pact with {display_name(b)}",
+                        "key": "diplomacy_defensive_pact"
+                    })
+                if b in timeline_data["players"]:
+                    empire_events[b].append({
+                        "date": date, "type": "DEFENSIVE_PACT_FORMED",
+                        "item": f"Defensive Pact with {display_name(a)}",
+                        "key": "diplomacy_defensive_pact"
+                    })
+
+            for a, b in sorted(active_dp_pairs - curr_dp_pairs):
+                msg = f"{display_name(a)} & {display_name(b)} ended their Defensive Pact"
+                add_notification(
+                    date, "DEFENSIVE_PACT_BROKEN", "diplomacy", "purple", "Defensive Pact Broken", msg,
+                    players=[c for c in (a, b) if c in timeline_data["players"]],
+                    icon="/gfx/interface/icons/diplomacy/diplomacy_defensive_pact.dds"
+                )
+                if a in timeline_data["players"]:
+                    empire_events[a].append({
+                        "date": date, "type": "DEFENSIVE_PACT_BROKEN",
+                        "item": f"Defensive Pact Ended ({display_name(b)})",
+                        "key": "diplomacy_defensive_pact"
+                    })
+                if b in timeline_data["players"]:
+                    empire_events[b].append({
+                        "date": date, "type": "DEFENSIVE_PACT_BROKEN",
+                        "item": f"Defensive Pact Ended ({display_name(a)})",
+                        "key": "diplomacy_defensive_pact"
+                    })
+
+            for a, b in sorted(curr_nap_pairs - active_nap_pairs):
+                msg = f"{display_name(a)} & {display_name(b)} signed a Non-Aggression Pact"
+                add_notification(
+                    date, "NAP_FORMED", "diplomacy", "purple", "Non-Aggression Pact", msg,
+                    players=[c for c in (a, b) if c in timeline_data["players"]],
+                    icon="/gfx/interface/icons/diplomacy/diplomacy_nonaggression.dds"
+                )
+                if a in timeline_data["players"]:
+                    empire_events[a].append({
+                        "date": date, "type": "NAP_FORMED",
+                        "item": f"Non-Aggression Pact with {display_name(b)}",
+                        "key": "diplomacy_nonaggression"
+                    })
+                if b in timeline_data["players"]:
+                    empire_events[b].append({
+                        "date": date, "type": "NAP_FORMED",
+                        "item": f"Non-Aggression Pact with {display_name(a)}",
+                        "key": "diplomacy_nonaggression"
+                    })
+
+            for a, b in sorted(active_nap_pairs - curr_nap_pairs):
+                msg = f"{display_name(a)} & {display_name(b)} ended their Non-Aggression Pact"
+                add_notification(
+                    date, "NAP_BROKEN", "diplomacy", "purple", "Non-Aggression Pact Broken", msg,
+                    players=[c for c in (a, b) if c in timeline_data["players"]],
+                    icon="/gfx/interface/icons/diplomacy/diplomacy_nonaggression.dds"
+                )
+                if a in timeline_data["players"]:
+                    empire_events[a].append({
+                        "date": date, "type": "NAP_BROKEN",
+                        "item": f"Non-Aggression Pact Ended ({display_name(b)})",
+                        "key": "diplomacy_nonaggression"
+                    })
+                if b in timeline_data["players"]:
+                    empire_events[b].append({
+                        "date": date, "type": "NAP_BROKEN",
+                        "item": f"Non-Aggression Pact Ended ({display_name(a)})",
+                        "key": "diplomacy_nonaggression"
+                    })
+
+            active_dp_pairs = set(curr_dp_pairs)
+            active_nap_pairs = set(curr_nap_pairs)
+
+        # --- 4. MAJOR FLEET LOSS & RESOURCE DEFICITS ---
+        for pid, stat_obj in res["player_stats"].items():
+            if pid not in alert_pids:
+                continue
+            curr_power = float(stat_obj.get("military_power", 0.0)) if stat_obj.get("alive", False) else 0.0
+            if pid in prev_fleet_power:
+                prev_p = prev_fleet_power[pid]
+                if prev_p >= MAJOR_FLEET_LOSS_MIN_POWER and curr_power < prev_p:
+                    lost = prev_p - curr_power
+                    drop_ratio = lost / prev_p
+                    if drop_ratio > MAJOR_FLEET_LOSS_PCT:
+                        pct_str = f"{drop_ratio * 100:.0f}%"
+                        msg = (
+                            f"{display_name(pid)} lost {pct_str} of their fleet "
+                            f"({_format_power(prev_p)} → {_format_power(curr_power)}, -{_format_power(lost)})"
+                        )
+                        add_notification(
+                            date, "MAJOR_FLEET_LOSS", "military", "red", "Major Fleet Loss", msg,
+                            players=[pid],
+                            icon="/gfx/interface/system/offensive_value.dds"
+                        )
+            prev_fleet_power[pid] = curr_power
+
+            # Deficits (stockpile == 0 with negative monthly net)
+            if not stat_obj.get("alive", False):
+                active_deficits[pid].clear()
+                continue
+            resources = stat_obj.get("resources", {})
+            for rk in RES_KEYS:
+                if rk in RESEARCH_RES_KEYS:
+                    continue
+                r_obj = resources.get(rk)
+                if not r_obj:
+                    continue
+                stock = float(r_obj.get("stockpile", 0.0))
+                bal = float(r_obj.get("balance", 0.0))
+                in_deficit = (stock <= 0.05 and bal < -0.01)
+                if in_deficit and rk not in active_deficits[pid]:
+                    active_deficits[pid].add(rk)
+                    r_label = RES_DISPLAY_LABELS.get(rk, rk.replace("_", " ").title())
+                    msg = f"{display_name(pid)} hit a {r_label} deficit (0 stockpile, {bal:+.1f}/mo)"
+                    add_notification(
+                        date, "DEFICIT", "economy", "amber", f"{r_label} Deficit", msg,
+                        players=[pid],
+                        icon=RES_ICON_PATHS.get(rk, "")
+                    )
+                elif not in_deficit and rk in active_deficits[pid]:
+                    active_deficits[pid].remove(rk)
+
+        # --- 5. MONTHLY ECONOMY MILESTONES (FIRST IN GALAXY = BLUE, OTHERS = LIGHT BLUE) ---
+        for metric_key, metric_label, thresholds, metric_icon in ECON_MILESTONES:
+            candidates = []
+            for pid, stat_obj in res["player_stats"].items():
+                if pid not in alert_pids or not stat_obj.get("alive", False):
+                    continue
+                resources = stat_obj.get("resources", {})
+                if metric_key == "tech":
+                    val = (
+                        float(resources.get("physics_research", {}).get("balance", 0.0))
+                        + float(resources.get("society_research", {}).get("balance", 0.0))
+                        + float(resources.get("engineering_research", {}).get("balance", 0.0))
+                    )
+                else:
+                    val = float(resources.get(metric_key, {}).get("balance", 0.0))
+                if val >= thresholds[0]:
+                    candidates.append((val, pid))
+
+            # Award galaxy-first to highest value if multiple players cross a threshold on the same save tick
+            candidates.sort(key=lambda x: x[0], reverse=True)
+            for thresh in thresholds:
+                for val, pid in candidates:
+                    if val < thresh:
+                        break
+                    m_key = (metric_key, thresh)
+                    if m_key in player_milestones_claimed[pid]:
+                        continue
+                    player_milestones_claimed[pid].add(m_key)
+                    is_first = m_key not in first_milestones_claimed
+                    if is_first:
+                        first_milestones_claimed.add(m_key)
+                        color = "blue"
+                        title = f"First to +{thresh:,} {metric_label}"
+                        msg = f"{display_name(pid)} is FIRST in the galaxy to reach +{thresh:,} {metric_label} ({val:+.0f}/mo)"
+                    else:
+                        color = "light_blue"
+                        title = f"+{thresh:,} {metric_label}"
+                        msg = f"{display_name(pid)} reached +{thresh:,} {metric_label} ({val:+.0f}/mo)"
+                    add_notification(
+                        date, "ECON_MILESTONE", "economy", color, title, msg,
+                        players=[pid], icon=metric_icon, is_first=is_first
+                    )
+
+        # --- 6. RECONCILE EMPIRE PROGRESSION, EDICTS, POLICIES & TECHNOLOGIES ---
+        for pid, prog in res["player_progression"].items():
+            if pid not in timeline_data["players"]:
+                continue
+            stat_obj = res["player_stats"].get(pid, {})
+            is_alive = stat_obj.get("alive", True)
+
+            if pid not in player_state:
+                player_state[pid] = {
+                    "gov_type": prog["gov_type"],
+                    "authority": prog["authority"],
+                    "ethics": set(prog["ethics"]),
+                    "civics": set(prog["civics"]),
+                    "traditions": set(prog["traditions"]),
+                    "ascension_perks": set(prog["ascension_perks"]),
+                    "council_agenda": prog["council_agenda"],
+                    "cooldown_agendas": set(prog["cooldown_agendas"]),
+                    "finish_modifiers": set(prog["finish_modifiers"]),
+                    "techs": set(prog["techs"]),
+                    "edicts": set(prog.get("edicts", [])),
+                    "policies": dict(prog.get("policies", {}))
+                }
+                if prog["council_agenda"]:
+                    empire_events[pid].append({
+                        "date": date,
+                        "type": "AGENDA_SELECTED",
+                        "item": clean_loc(prog["council_agenda"], loc_dict),
+                        "key": prog["council_agenda"]
+                    })
+                for ag in prog["cooldown_agendas"]:
+                    empire_events[pid].append({
+                        "date": date,
+                        "type": "AGENDA_LAUNCHED",
+                        "item": clean_loc(ag, loc_dict),
+                        "key": ag
+                    })
+                for ed in prog.get("edicts", []):
+                    empire_events[pid].append({
+                        "date": date,
+                        "type": "EDICT_ACTIVATED",
+                        "item": clean_edict_loc(ed, loc_dict),
+                        "key": f"edict_{ed}"
+                    })
+                for t in prog["traditions"]:
+                    empire_events[pid].append({
+                        "date": date,
+                        "type": "TRADITION",
+                        "item": format_tradition_name(t, loc_dict),
+                        "key": t
+                    })
+                for ap in prog["ascension_perks"]:
+                    empire_events[pid].append({
+                        "date": date,
+                        "type": "ASCENSION_PERK",
+                        "item": clean_loc(ap, loc_dict),
+                        "key": ap
+                    })
+                for t_key, lvl in prog["techs"]:
+                    tech_events[pid].append(make_tech_event(date, t_key, lvl, True))
+            else:
+                st = player_state[pid]
+
+                # 6a. Technologies researched
+                for t_tuple in prog["techs"]:
+                    if t_tuple not in st["techs"]:
+                        st["techs"].add(t_tuple)
+                        t_ev = make_tech_event(date, t_tuple[0], t_tuple[1], False)
+                        tech_events[pid].append(t_ev)
+
+                        if pid in alert_pids and t_tuple[0] in WATCHED_ALERT_TECHS and t_tuple[1] == 1:
+                            is_first = t_tuple[0] not in first_techs_claimed
+                            if is_first:
+                                first_techs_claimed.add(t_tuple[0])
+                                color = "light_green"
+                                title = f"First Tech: {t_ev['name']}"
+                                msg = f"{display_name(pid)} is FIRST in the galaxy to research {t_ev['name']}"
+                            else:
+                                color = "green"
+                                title = f"Tech: {t_ev['name']}"
+                                msg = f"{display_name(pid)} researched {t_ev['name']}"
+                            add_notification(
+                                date, "TECH_UNLOCKED", "tech", color, title, msg,
+                                players=[pid], icon=t_ev["icon"], is_first=is_first
+                            )
+
+                # 6b. Traditions unlocked (+ Ascension open/close alerts)
+                for t in prog["traditions"]:
+                    if t not in st["traditions"]:
+                        st["traditions"].add(t)
+                        empire_events[pid].append({
+                            "date": date,
+                            "type": "TRADITION",
+                            "item": format_tradition_name(t, loc_dict),
+                            "key": t
+                        })
+                        if pid in alert_pids:
+                            asc_match = match_ascension_tradition(t, loc_dict)
+                            if asc_match:
+                                action, tree_label = asc_match
+                                title = f"{tree_label} {action.title()}"
+                                msg = f"{display_name(pid)} {action} {tree_label} Traditions"
+                                add_notification(
+                                    date, "ASCENSION_TRADITION", "ascension", "orange", title, msg,
+                                    players=[pid],
+                                    icon=ui_icon_map.get(t, "/gfx/interface/icons/menu_icon_traditions.dds")
+                                )
+
+                # 6c. Ascension Perks unlocked
+                for ap in prog["ascension_perks"]:
+                    if ap not in st["ascension_perks"]:
+                        st["ascension_perks"].add(ap)
+                        empire_events[pid].append({
+                            "date": date,
+                            "type": "ASCENSION_PERK",
+                            "item": clean_loc(ap, loc_dict),
+                            "key": ap
+                        })
+
+                if is_alive:
+                    # 6d. Government or Authority changed
+                    new_gov, new_auth = prog["gov_type"], prog["authority"]
+                    if (new_gov and new_gov != st["gov_type"]) or (new_auth and new_auth != st["authority"]):
+                        old_desc = clean_loc(st["gov_type"] or st["authority"], loc_dict)
+                        new_desc = clean_loc(new_gov or new_auth, loc_dict)
+                        if new_auth != st["authority"] and new_auth:
+                            new_desc = f"{new_desc} ({clean_loc(new_auth, loc_dict)})"
+                        change_str = f"{old_desc} → {new_desc}"
+                        empire_events[pid].append({
+                            "date": date,
+                            "type": "GOV_CHANGED",
+                            "item": change_str,
+                            "key": new_gov or new_auth
+                        })
+                        if pid in alert_pids:
+                            add_notification(
+                                date, "GOV_CHANGED", "government", "yellow", "Government Changed",
+                                f"{display_name(pid)} reformed government: {change_str}",
+                                players=[pid],
+                                icon="/gfx/interface/icons/gamesetup_gov_sel.dds"
+                            )
+                        st["gov_type"] = new_gov
+                        st["authority"] = new_auth
+
+                    # 6e. Ethics shifted
+                    curr_ethics = set(prog["ethics"])
+                    if curr_ethics and curr_ethics != st["ethics"]:
+                        added_raw = sorted(curr_ethics - st["ethics"])
+                        removed_raw = sorted(st["ethics"] - curr_ethics)
+                        added = [clean_loc(e, loc_dict) for e in added_raw]
+                        removed = [clean_loc(e, loc_dict) for e in removed_raw]
+                        parts = []
+                        if added: parts.append(f"+{', '.join(added)}")
+                        if removed: parts.append(f"-{', '.join(removed)}")
+                        change_str = " / ".join(parts)
+                        key_ref = added_raw[0] if added_raw else ""
+                        empire_events[pid].append({
+                            "date": date,
+                            "type": "ETHICS_CHANGED",
+                            "item": change_str,
+                            "key": key_ref
+                        })
+                        if pid in alert_pids:
+                            add_notification(
+                                date, "ETHICS_CHANGED", "government", "yellow", "Ethics Shifted",
+                                f"{display_name(pid)} shifted ethics: {change_str}",
+                                players=[pid],
+                                icon=ui_icon_map.get(key_ref, "/gfx/interface/council_view/icon_ethics.dds")
+                            )
+                        st["ethics"] = curr_ethics
+
+                    # 6f. Civics reformed
+                    curr_civics = set(prog["civics"])
+                    if curr_civics != st["civics"]:
+                        added_raw = sorted(curr_civics - st["civics"])
+                        removed_raw = sorted(st["civics"] - curr_civics)
+                        added = [clean_loc(c, loc_dict) for c in added_raw]
+                        removed = [clean_loc(c, loc_dict) for c in removed_raw]
+                        parts = []
+                        if added: parts.append(f"+{', '.join(added)}")
+                        if removed: parts.append(f"-{', '.join(removed)}")
+                        change_str = " / ".join(parts)
+                        key_ref = added_raw[0] if added_raw else ""
+                        empire_events[pid].append({
+                            "date": date,
+                            "type": "CIVICS_CHANGED",
+                            "item": change_str,
+                            "key": key_ref
+                        })
+                        if pid in alert_pids:
+                            add_notification(
+                                date, "CIVICS_CHANGED", "government", "yellow", "Civics Reformed",
+                                f"{display_name(pid)} reformed civics: {change_str}",
+                                players=[pid],
+                                icon=ui_icon_map.get(key_ref, "/gfx/interface/icons/gamesetup_gov_sel.dds")
+                            )
+                        st["civics"] = curr_civics
+
+                    # 6g. Edicts activated / deactivated
+                    curr_edicts = set(prog.get("edicts", []))
+                    for ed in sorted(curr_edicts - st["edicts"]):
+                        empire_events[pid].append({
+                            "date": date,
+                            "type": "EDICT_ACTIVATED",
+                            "item": clean_edict_loc(ed, loc_dict),
+                            "key": f"edict_{ed}"
+                        })
+                    for ed in sorted(st["edicts"] - curr_edicts):
+                        empire_events[pid].append({
+                            "date": date,
+                            "type": "EDICT_REMOVED",
+                            "item": clean_edict_loc(ed, loc_dict),
+                            "key": f"edict_{ed}"
+                        })
+                    st["edicts"] = curr_edicts
+
+                    # 6h. Policies changed
+                    curr_policies = prog.get("policies", {})
+                    for pol_key, new_sel in curr_policies.items():
+                        old_sel = st["policies"].get(pol_key)
+                        if old_sel is None:
+                            cat_name = clean_policy_cat_loc(pol_key, loc_dict)
+                            new_opt = clean_policy_opt_loc(new_sel, loc_dict)
+                            empire_events[pid].append({
+                                "date": date,
+                                "type": "POLICY_CHANGED",
+                                "item": f"{cat_name}: {new_opt}",
+                                "key": new_sel
+                            })
+                        elif old_sel != new_sel:
+                            cat_name = clean_policy_cat_loc(pol_key, loc_dict)
+                            old_opt = clean_policy_opt_loc(old_sel, loc_dict)
+                            new_opt = clean_policy_opt_loc(new_sel, loc_dict)
+                            empire_events[pid].append({
+                                "date": date,
+                                "type": "POLICY_CHANGED",
+                                "item": f"{cat_name}: {old_opt} → {new_opt}",
+                                "key": new_sel
+                            })
+                    st["policies"] = dict(curr_policies)
+
+                # 6i. Agenda Launched
+                curr_cd_agendas = set(prog["cooldown_agendas"])
+                newly_launched = set()
+                for ag in (curr_cd_agendas - st["cooldown_agendas"]):
+                    newly_launched.add(ag)
+                    empire_events[pid].append({
+                        "date": date,
+                        "type": "AGENDA_LAUNCHED",
+                        "item": clean_loc(ag, loc_dict),
+                        "key": ag
+                    })
+                st["cooldown_agendas"] = curr_cd_agendas
+
+                curr_mods = set(prog["finish_modifiers"])
+                for mod in (curr_mods - st["finish_modifiers"]):
+                    ag_base = mod[:-7] if mod.endswith("_finish") else mod
+                    if ag_base not in newly_launched:
+                        empire_events[pid].append({
+                            "date": date,
+                            "type": "AGENDA_LAUNCHED",
+                            "item": clean_loc(ag_base, loc_dict),
+                            "key": ag_base
+                        })
+                st["finish_modifiers"] = curr_mods
+
+                # 6j. Agenda Selected
+                new_ag = prog["council_agenda"]
+                if new_ag != st["council_agenda"]:
+                    if new_ag:
+                        empire_events[pid].append({
+                            "date": date,
+                            "type": "AGENDA_SELECTED",
+                            "item": clean_loc(new_ag, loc_dict),
+                            "key": new_ag
+                        })
+                    st["council_agenda"] = new_ag
+
+        # --- 7. RECONCILE PLANETARY BUILDS, BLOCKERS REMOVED & CAPTURES ---
+        colony_map = res["colony_map"]
+        for item_id, player_id, build_item, internal_colony_id in res["raw_queue_items"]:
+            true_planet_id = colony_map.get(
+                internal_colony_id,
+                master_colony_map.get(internal_colony_id, internal_colony_id)
+            )
+            if true_planet_id and item_id not in seen_construction_ids:
+                seen_construction_ids.add(item_id)
+                build_orders[player_id][true_planet_id].append((date, "BUILD", build_item))
+
+        # Blockers removed (diffed per planet while owned by the same player)
+        for p_id, curr_blockers in res.get("planet_blockers", {}).items():
+            curr_owner = res["new_owners"].get(p_id)
+            if not curr_owner or curr_owner == '4294967295':
+                continue
+            prev_entry = planet_prev_blockers.get(p_id)
+            if prev_entry is not None:
+                prev_owner, prev_map = prev_entry
+                if prev_owner == curr_owner:
+                    for dep_id, dep_type in prev_map.items():
+                        if dep_id not in curr_blockers:
+                            build_orders[curr_owner][p_id].append((date, "BLOCKER_REMOVED", dep_type))
+            planet_prev_blockers[p_id] = (curr_owner, dict(curr_blockers))
+
+        # Planet & Capital Captures (tracks both instant occupation via controller and Total War ownership flips)
+        new_owners = res.get("new_owners", {})
+        new_controllers = res.get("new_controllers", new_owners)
+
+        for p_id, new_owner in new_owners.items():
+            old_owner = planet_current_owners.get(p_id)
+            prev_ctrl = planet_current_controllers.get(p_id, old_owner)
+            new_ctrl = new_controllers.get(p_id, new_owner)
+
+            if old_owner != new_owner:
+                if old_owner and old_owner != '4294967295' and new_owner != '4294967295':
+                    build_orders[old_owner][p_id].append((date, "LOST", new_owner))
+                    build_orders[new_owner][p_id].append((date, "TAKEN", old_owner))
+                elif (not old_owner or old_owner == '4294967295') and new_owner != '4294967295':
+                    build_orders[new_owner][p_id].append((date, "COLONIZED", None))
+
+            # Fire live capture alert once when a hostile empire takes control (occupation or conquest)
+            if not is_initial_save and new_ctrl and new_ctrl != '4294967295':
+                victim = None
+                occupied_only = False
+
+                if old_owner and old_owner != '4294967295' and new_ctrl != prev_ctrl:
+                    if new_ctrl != new_owner and new_owner != '4294967295':
+                        victim = new_owner
+                        occupied_only = True
+                    elif new_owner != old_owner and new_ctrl == new_owner:
+                        victim = old_owner
+                        occupied_only = False
+
+                if victim and victim != new_ctrl and (victim in alert_pids or new_ctrl in alert_pids):
+                    p_name = master_planet_names.get(p_id, f"Planet #{p_id}")
+                    is_capital = (player_known_capitals.get(victim) == p_id)
+                    verb = "occupied" if occupied_only else "captured"
+                    if is_capital:
+                        add_notification(
+                            date, "CAPITAL_CAPTURED", "military", "red", "Capital Captured!",
+                            f"{display_name(new_ctrl)} {verb} {display_name(victim)}'s capital ({p_name})!",
+                            players=[c for c in (new_ctrl, victim) if c in timeline_data["players"]],
+                            icon="/gfx/interface/icons/occupation_flag.dds"
+                        )
+                    else:
+                        add_notification(
+                            date, "PLANET_CAPTURED", "military", "purple", "Planet Captured",
+                            f"{display_name(new_ctrl)} {verb} {p_name} from {display_name(victim)}",
+                            players=[c for c in (new_ctrl, victim) if c in timeline_data["players"]],
+                            icon="/gfx/interface/icons/planet_invasion.dds"
+                        )
+
+            planet_current_owners[p_id] = new_owner
+            planet_current_controllers[p_id] = new_ctrl
+
+        # Update known capitals AFTER capture checks so Total War capital moves still match the prior capital ID
+        for pid, cap_id in res.get("player_capitals", {}).items():
+            if cap_id:
+                player_known_capitals[pid] = cap_id
+
+    for pid, evts in empire_events.items():
+        if pid in timeline_data["players"]:
+            timeline_data["players"][pid]["empire_events"] = sorted(evts, key=lambda x: x["date"])
+
+    for pid, tevts in tech_events.items():
+        if pid in timeline_data["players"]:
+            timeline_data["players"][pid]["tech_events"] = sorted(tevts, key=lambda x: x["date"])
+
+    for pid, planets in build_orders.items():
+        if pid not in timeline_data["players"]:
+            continue
+        for planet_id, builds in planets.items():
+            raw_planet_name = master_planet_names.get(planet_id, f"Planet ID {planet_id}")
+            clean_builds = []
+            for event in sorted(builds, key=lambda x: x[0]):
+                date, evt_type, evt_data = event
+                if evt_type == "BUILD":
+                    clean_item = clean_loc(evt_data, loc_dict)
+                    clean_builds.append({"date": date, "type": "BUILD", "item": clean_item, "key": evt_data})
+                elif evt_type == "BLOCKER_REMOVED":
+                    clean_item = clean_loc(evt_data, loc_dict)
+                    clean_builds.append({"date": date, "type": "BLOCKER_REMOVED", "item": clean_item, "key": evt_data})
+                elif evt_type in ["TAKEN", "LOST"]:
+                    clean_builds.append({
+                        "date": date,
+                        "type": evt_type,
+                        "item": display_name(evt_data)
+                    })
+                elif evt_type == "COLONIZED":
+                    clean_builds.append({"date": date, "type": "COLONIZED", "item": None})
+            timeline_data["players"][pid]["planets"][planet_id] = {
+                "name": raw_planet_name,
+                "builds": clean_builds
+            }
+
+    timeline_data["notifications"] = sorted(notifications, key=lambda n: n["date"])
+    return timeline_data
 
 
 def main():
@@ -1378,6 +2863,7 @@ def main():
     print(f"\nFound {len(sav_files)} save files. Processing...")
     loc_dict = load_stellaris_localization(game_folder)
     comp_icons, entity_icons, tech_catalog = build_game_catalog(game_folder)
+    blocker_types = load_blocker_types(game_folder)
     ui_icon_map = build_ui_icon_map(entity_icons, loc_dict)
 
     print("\n[2/4] Extracting dates and identifying campaign...")
@@ -1402,6 +2888,8 @@ def main():
     first_gamestate = extract_gamestate_content(saves_metadata[0]['filepath'])
     latest_gamestate = extract_gamestate_content(saves_metadata[-1]['filepath'])
     player_map = extract_player_names(first_gamestate)
+    human_pids = extract_human_player_ids(first_gamestate) | extract_human_player_ids(latest_gamestate)
+
     for pid, pname in extract_player_names(latest_gamestate).items():
         if pid not in player_map or player_map[pid].startswith("Defeated Player") or player_map[pid].startswith("Ai Empire"):
             if not pname.startswith("Defeated Player"):
@@ -1409,22 +2897,6 @@ def main():
 
     print("      -> Generating static Galaxy & Spawn Check Map from initial save...")
     galaxy_map_data = extract_galaxy_map_data(first_gamestate, loc_dict, player_map)
-
-    timeline_data = {
-        "campaign_name": campaign_name,
-        "icons": ui_icon_map,
-        "galaxy_map": galaxy_map_data,
-        "players": {}
-    }
-    for pid, pname in player_map.items():
-        timeline_data["players"][pid] = {
-            "name": pname,
-            "empire_name": pname,
-            "stats_history": [],
-            "empire_events": [],
-            "tech_events": [],
-            "planets": {}
-        }
 
     total_files = len(saves_metadata)
     max_workers = max(1, (os.cpu_count() or 4) - 1)
@@ -1441,7 +2913,7 @@ def main():
     with ProcessPoolExecutor(
         max_workers=max_workers,
         initializer=init_worker,
-        initargs=(loc_dict, list(player_map.keys()), comp_icons)
+        initargs=(loc_dict, list(player_map.keys()), comp_icons, blocker_types)
     ) as executor:
         futures = {executor.submit(process_single_save, t): t[0] for t in tasks}
         for future in as_completed(futures):
@@ -1457,273 +2929,18 @@ def main():
                 end='\r'
             )
 
-    # Step 4: Chronological Reconciliation Pass
-    print("\n\n[4/4] Reconciling build orders, technologies, traditions, ethics, civics, and agendas...")
-    build_orders = defaultdict(lambda: defaultdict(list))
-    seen_construction_ids = set()
-    planet_current_owners = {}
-    master_colony_map = {}
-    master_planet_names = {}
-
-    player_state = {}
-    empire_events = defaultdict(list)
-    tech_events = defaultdict(list)
-
-    def make_tech_event(date_str, t_key, level, is_starting):
-        t_meta = tech_catalog.get(t_key, {
-            "area": "physics",
-            "tier": 1,
-            "icon": "/gfx/interface/icons/research_icon.dds"
-        })
-        base_name = clean_loc(t_key, loc_dict)
-        if level > 1:
-            base_name = f"{base_name} (Level {level})"
-        return {
-            "date": date_str,
-            "key": t_key,
-            "name": base_name,
-            "area": t_meta["area"],
-            "tier": t_meta["tier"],
-            "icon": t_meta["icon"],
-            "starting": is_starting
-        }
-
-    for res in results:
-        if not res:
-            continue
-        date = res["date"]
-
-        for pid, stat_obj in res["player_stats"].items():
-            if pid in timeline_data["players"]:
-                timeline_data["players"][pid]["stats_history"].append(stat_obj)
-
-        for pid, emp_name in res["empire_names"].items():
-            if emp_name and pid in timeline_data["players"]:
-                timeline_data["players"][pid]["empire_name"] = emp_name
-
-        # Reconcile Empire Progression & Technologies
-        for pid, prog in res["player_progression"].items():
-            if pid not in timeline_data["players"]:
-                continue
-
-            if pid not in player_state:
-                player_state[pid] = {
-                    "gov_type": prog["gov_type"],
-                    "authority": prog["authority"],
-                    "ethics": set(prog["ethics"]),
-                    "civics": set(prog["civics"]),
-                    "traditions": set(prog["traditions"]),
-                    "ascension_perks": set(prog["ascension_perks"]),
-                    "council_agenda": prog["council_agenda"],
-                    "cooldown_agendas": set(prog["cooldown_agendas"]),
-                    "finish_modifiers": set(prog["finish_modifiers"]),
-                    "techs": set(prog["techs"])
-                }
-                if prog["council_agenda"]:
-                    empire_events[pid].append({
-                        "date": date,
-                        "type": "AGENDA_SELECTED",
-                        "item": clean_loc(prog["council_agenda"], loc_dict),
-                        "key": prog["council_agenda"]
-                    })
-                for ag in prog["cooldown_agendas"]:
-                    empire_events[pid].append({
-                        "date": date,
-                        "type": "AGENDA_LAUNCHED",
-                        "item": clean_loc(ag, loc_dict),
-                        "key": ag
-                    })
-                for t in prog["traditions"]:
-                    empire_events[pid].append({
-                        "date": date,
-                        "type": "TRADITION",
-                        "item": format_tradition_name(t, loc_dict),
-                        "key": t
-                    })
-                for ap in prog["ascension_perks"]:
-                    empire_events[pid].append({
-                        "date": date,
-                        "type": "ASCENSION_PERK",
-                        "item": clean_loc(ap, loc_dict),
-                        "key": ap
-                    })
-                for t_key, lvl in prog["techs"]:
-                    tech_events[pid].append(make_tech_event(date, t_key, lvl, True))
-            else:
-                st = player_state[pid]
-
-                # 1. Technologies researched
-                for t_tuple in prog["techs"]:
-                    if t_tuple not in st["techs"]:
-                        st["techs"].add(t_tuple)
-                        tech_events[pid].append(make_tech_event(date, t_tuple[0], t_tuple[1], False))
-
-                # 2. Traditions unlocked
-                for t in prog["traditions"]:
-                    if t not in st["traditions"]:
-                        st["traditions"].add(t)
-                        empire_events[pid].append({
-                            "date": date,
-                            "type": "TRADITION",
-                            "item": format_tradition_name(t, loc_dict),
-                            "key": t
-                        })
-
-                # 3. Ascension Perks unlocked
-                for ap in prog["ascension_perks"]:
-                    if ap not in st["ascension_perks"]:
-                        st["ascension_perks"].add(ap)
-                        empire_events[pid].append({
-                            "date": date,
-                            "type": "ASCENSION_PERK",
-                            "item": clean_loc(ap, loc_dict),
-                            "key": ap
-                        })
-
-                # 4. Government or Authority changed
-                new_gov, new_auth = prog["gov_type"], prog["authority"]
-                if (new_gov and new_gov != st["gov_type"]) or (new_auth and new_auth != st["authority"]):
-                    old_desc = clean_loc(st["gov_type"] or st["authority"], loc_dict)
-                    new_desc = clean_loc(new_gov or new_auth, loc_dict)
-                    if new_auth != st["authority"] and new_auth:
-                        new_desc = f"{new_desc} ({clean_loc(new_auth, loc_dict)})"
-                    empire_events[pid].append({
-                        "date": date,
-                        "type": "GOV_CHANGED",
-                        "item": f"{old_desc} → {new_desc}",
-                        "key": new_gov or new_auth
-                    })
-                    st["gov_type"] = new_gov
-                    st["authority"] = new_auth
-
-                # 5. Ethics shifted
-                curr_ethics = set(prog["ethics"])
-                if curr_ethics and curr_ethics != st["ethics"]:
-                    added_raw = sorted(curr_ethics - st["ethics"])
-                    removed_raw = sorted(st["ethics"] - curr_ethics)
-                    added = [clean_loc(e, loc_dict) for e in added_raw]
-                    removed = [clean_loc(e, loc_dict) for e in removed_raw]
-                    parts = []
-                    if added: parts.append(f"+{', '.join(added)}")
-                    if removed: parts.append(f"-{', '.join(removed)}")
-                    empire_events[pid].append({
-                        "date": date,
-                        "type": "ETHICS_CHANGED",
-                        "item": " / ".join(parts),
-                        "key": added_raw[0] if added_raw else ""
-                    })
-                    st["ethics"] = curr_ethics
-
-                # 6. Civics reformed
-                curr_civics = set(prog["civics"])
-                if curr_civics != st["civics"]:
-                    added_raw = sorted(curr_civics - st["civics"])
-                    removed_raw = sorted(st["civics"] - curr_civics)
-                    added = [clean_loc(c, loc_dict) for c in added_raw]
-                    removed = [clean_loc(c, loc_dict) for c in removed_raw]
-                    parts = []
-                    if added: parts.append(f"+{', '.join(added)}")
-                    if removed: parts.append(f"-{', '.join(removed)}")
-                    empire_events[pid].append({
-                        "date": date,
-                        "type": "CIVICS_CHANGED",
-                        "item": " / ".join(parts),
-                        "key": added_raw[0] if added_raw else ""
-                    })
-                    st["civics"] = curr_civics
-
-                # 7. Agenda Launched
-                curr_cd_agendas = set(prog["cooldown_agendas"])
-                newly_launched = set()
-                for ag in (curr_cd_agendas - st["cooldown_agendas"]):
-                    newly_launched.add(ag)
-                    empire_events[pid].append({
-                        "date": date,
-                        "type": "AGENDA_LAUNCHED",
-                        "item": clean_loc(ag, loc_dict),
-                        "key": ag
-                    })
-                st["cooldown_agendas"] = curr_cd_agendas
-
-                curr_mods = set(prog["finish_modifiers"])
-                for mod in (curr_mods - st["finish_modifiers"]):
-                    ag_base = mod[:-7] if mod.endswith("_finish") else mod
-                    if ag_base not in newly_launched:
-                        empire_events[pid].append({
-                            "date": date,
-                            "type": "AGENDA_LAUNCHED",
-                            "item": clean_loc(ag_base, loc_dict),
-                            "key": ag_base
-                        })
-                st["finish_modifiers"] = curr_mods
-
-                # 8. Agenda Selected
-                new_ag = prog["council_agenda"]
-                if new_ag != st["council_agenda"]:
-                    if new_ag:
-                        empire_events[pid].append({
-                            "date": date,
-                            "type": "AGENDA_SELECTED",
-                            "item": clean_loc(new_ag, loc_dict),
-                            "key": new_ag
-                        })
-                    st["council_agenda"] = new_ag
-
-        # Reconcile Planetary Builds
-        colony_map = res["colony_map"]
-        master_colony_map.update(colony_map)
-        master_planet_names.update(res["planet_names"])
-
-        for item_id, player_id, build_item, internal_colony_id in res["raw_queue_items"]:
-            true_planet_id = colony_map.get(
-                internal_colony_id,
-                master_colony_map.get(internal_colony_id, internal_colony_id)
-            )
-            if true_planet_id and item_id not in seen_construction_ids:
-                seen_construction_ids.add(item_id)
-                build_orders[player_id][true_planet_id].append((date, "BUILD", build_item))
-
-        for pid, new_owner in res["new_owners"].items():
-            old_owner = planet_current_owners.get(pid)
-            if old_owner != new_owner:
-                if old_owner and old_owner != '4294967295' and new_owner != '4294967295':
-                    build_orders[old_owner][pid].append((date, "LOST", new_owner))
-                    build_orders[new_owner][pid].append((date, "TAKEN", old_owner))
-                elif (not old_owner or old_owner == '4294967295') and new_owner != '4294967295':
-                    build_orders[new_owner][pid].append((date, "COLONIZED", None))
-                planet_current_owners[pid] = new_owner
-
-    for pid, evts in empire_events.items():
-        if pid in timeline_data["players"]:
-            timeline_data["players"][pid]["empire_events"] = sorted(evts, key=lambda x: x["date"])
-
-    for pid, tevts in tech_events.items():
-        if pid in timeline_data["players"]:
-            timeline_data["players"][pid]["tech_events"] = sorted(tevts, key=lambda x: x["date"])
-
-    for pid, planets in build_orders.items():
-        if pid not in timeline_data["players"]:
-            continue
-        for planet_id, builds in planets.items():
-            raw_planet_name = master_planet_names.get(planet_id, f"Planet ID {planet_id}")
-            clean_builds = []
-            for event in sorted(builds, key=lambda x: x[0]):
-                date, evt_type, evt_data = event
-                if evt_type == "BUILD":
-                    clean_item = clean_loc(evt_data, loc_dict)
-                    clean_builds.append({"date": date, "type": "BUILD", "item": clean_item, "key": evt_data})
-                elif evt_type in ["TAKEN", "LOST"]:
-                    clean_builds.append({
-                        "date": date,
-                        "type": evt_type,
-                        "item": player_map.get(evt_data, f"AI/Entity {evt_data}")
-                    })
-                elif evt_type == "COLONIZED":
-                    clean_builds.append({"date": date, "type": "COLONIZED", "item": None})
-            timeline_data["players"][pid]["planets"][planet_id] = {
-                "name": raw_planet_name,
-                "builds": clean_builds
-            }
+    print("\n\n[4/4] Reconciling build orders, blockers, edicts, policies, diplomacy, and live notifications...")
+    timeline_data = reconcile_timeline_results(
+        campaign_name=campaign_name,
+        player_map=player_map,
+        results=results,
+        loc_dict=loc_dict,
+        tech_catalog=tech_catalog,
+        ui_icon_map=ui_icon_map,
+        galaxy_map=galaxy_map_data,
+        human_pids=human_pids,
+        include_last_updated=False
+    )
 
     output_dir = os.path.join(script_dir, "output")
     os.makedirs(output_dir, exist_ok=True)
@@ -1733,7 +2950,10 @@ def main():
         json.dump(timeline_data, f, indent=4, ensure_ascii=False)
 
     total_elapsed = time.time() - start_time
-    print(f"\n[SUCCESS] Timeline saved to output/{filename} in {total_elapsed:.1f} seconds!")
+    print(
+        f"\n[SUCCESS] Timeline saved to output/{filename} "
+        f"({len(timeline_data['notifications'])} notifications) in {total_elapsed:.1f} seconds!"
+    )
     os.system('pause')
 
 

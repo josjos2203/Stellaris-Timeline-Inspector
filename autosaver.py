@@ -1,12 +1,12 @@
 import os
 import re
+import gzip
 import json
 import time
 import ctypes
 import shutil
 import zipfile
 from datetime import datetime
-from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from setup_config import get_stellaris_dir
@@ -19,6 +19,10 @@ OUTPUT_FOLDER = os.path.join(SCRIPT_DIR, "output")
 
 # How often to check for new autosaves (in seconds)
 CHECK_INTERVAL_SECONDS = 15
+
+# Bump this if the parsed save snapshot structure in build_order_extractor.py changes
+CACHE_VERSION = 2
+CACHE_FILENAME = ".live_state_cache.json.gz"
 
 
 def set_low_cpu_priority():
@@ -74,14 +78,79 @@ def get_folder_latest_mtime(folder_path):
     return latest
 
 
+def _restore_snapshot_types(snapshot):
+    """Restores hashable tuples (e.g. tech (key, level) pairs) after loading a JSON cache from disk."""
+    for prog in snapshot.get("player_progression", {}).values():
+        if "techs" in prog:
+            prog["techs"] = [tuple(t) for t in prog["techs"]]
+    if "raw_queue_items" in snapshot:
+        snapshot["raw_queue_items"] = [tuple(item) for item in snapshot["raw_queue_items"]]
+    return snapshot
+
+
 class LiveCampaignIncrementalBuilder:
-    """Caches file headers, static galaxy map, and parsed save results so save #338 is just as fast as save #1."""
+    """
+    Caches file headers, static galaxy map, and parsed per-date save snapshots (in RAM and on disk)
+    so each incoming autosave is parsed once and reconciled with full history (firsts, fleet dips,
+    diplomacy diffs, blockers, edicts, and policies) via build_order_extractor.reconcile_timeline_results.
+    """
     def __init__(self, game_folder):
         self.game_folder = game_folder
         self.loc_dict = boe.load_stellaris_localization(game_folder)
         self.comp_icons, self.entity_icons, self.tech_catalog = boe.build_game_catalog(game_folder)
+        self.blocker_types = boe.load_blocker_types(game_folder)
         self.ui_icon_map = boe.build_ui_icon_map(self.entity_icons, self.loc_dict)
         self.campaigns = {}
+
+    def _load_disk_cache(self, folder_name, backup_dir):
+        cache_path = os.path.join(backup_dir, CACHE_FILENAME)
+        if not os.path.exists(cache_path):
+            return None
+        try:
+            with gzip.open(cache_path, "rt", encoding="utf-8") as f:
+                data = json.load(f)
+            if data.get("version") != CACHE_VERSION:
+                return None
+
+            parsed_by_date = {
+                d_str: _restore_snapshot_types(snap)
+                for d_str, snap in data.get("parsed_by_date", {}).items()
+            }
+            print(
+                f"[{datetime.now().strftime('%H:%M:%S')}] [CACHE] Restored {len(parsed_by_date)} "
+                f"parsed save(s) for '{folder_name}' from disk."
+            )
+            return {
+                "parsed_by_date": parsed_by_date,
+                "file_header_cache": {},
+                "player_map": data.get("player_map", {}),
+                "human_pids": set(data.get("human_pids", [])),
+                "galaxy_map": data.get("galaxy_map"),
+                "campaign_name": data.get("campaign_name", folder_name),
+                "last_notif_count": int(data.get("last_notif_count", 0))
+            }
+        except Exception as e:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] [CACHE] Ignoring unreadable cache for '{folder_name}': {e}")
+            return None
+
+    def _save_disk_cache(self, backup_dir, camp):
+        cache_path = os.path.join(backup_dir, CACHE_FILENAME)
+        temp_path = os.path.join(backup_dir, f"{CACHE_FILENAME}.tmp")
+        payload = {
+            "version": CACHE_VERSION,
+            "campaign_name": camp["campaign_name"],
+            "player_map": camp["player_map"],
+            "human_pids": sorted(list(camp["human_pids"])),
+            "galaxy_map": camp["galaxy_map"],
+            "last_notif_count": camp["last_notif_count"],
+            "parsed_by_date": camp["parsed_by_date"]
+        }
+        try:
+            with gzip.open(temp_path, "wt", encoding="utf-8", compresslevel=3) as f:
+                json.dump(payload, f, separators=(',', ':'), ensure_ascii=False)
+            os.replace(temp_path, cache_path)
+        except Exception as e:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] [CACHE] Warning: failed to save state cache: {e}")
 
     def sync_and_archive_saves(self, src_dir, backup_dir):
         """
@@ -123,15 +192,21 @@ class LiveCampaignIncrementalBuilder:
         return new_dates_found
 
     def update_campaign_timeline(self, folder_name, backup_dir):
-        """Incrementally parses only new save dates and writes compact JSON atomically."""
+        """Incrementally parses only new save dates, updates persistent cache, and writes compact JSON atomically."""
         if folder_name not in self.campaigns:
-            self.campaigns[folder_name] = {
-                "parsed_by_date": {},
-                "file_header_cache": {},
-                "player_map": {},
-                "galaxy_map": None,
-                "campaign_name": folder_name
-            }
+            restored = self._load_disk_cache(folder_name, backup_dir)
+            if restored is not None:
+                self.campaigns[folder_name] = restored
+            else:
+                self.campaigns[folder_name] = {
+                    "parsed_by_date": {},
+                    "file_header_cache": {},
+                    "player_map": {},
+                    "human_pids": set(),
+                    "galaxy_map": None,
+                    "campaign_name": folder_name,
+                    "last_notif_count": 0
+                }
 
         camp = self.campaigns[folder_name]
         header_cache = camp["file_header_cache"]
@@ -165,50 +240,63 @@ class LiveCampaignIncrementalBuilder:
             if d_str not in saves_by_date or entry.name.startswith("archive_"):
                 saves_by_date[d_str] = filepath
 
-        if not saves_by_date:
+        if not saves_by_date and not camp["parsed_by_date"]:
             return
 
-        sorted_dates = sorted(saves_by_date.keys())
+        disk_dates = sorted(saves_by_date.keys())
         campaign_name = re.sub(r'[\\/*?:"<>|]', "", campaign_raw_name)
         camp["campaign_name"] = campaign_name
 
-        # Initialize player_map and static galaxy_map ONCE from the earliest save
-        if not camp["player_map"]:
-            first_gs = boe.extract_gamestate_content(saves_by_date[sorted_dates[0]])
+        # Initialize player_map, human_pids, and static galaxy_map ONCE from the earliest save
+        if not camp["player_map"] and disk_dates:
+            first_gs = boe.extract_gamestate_content(saves_by_date[disk_dates[0]])
             camp["player_map"] = boe.extract_player_names(first_gs)
+            camp["human_pids"] = boe.extract_human_player_ids(first_gs)
             camp["galaxy_map"] = boe.extract_galaxy_map_data(first_gs, self.loc_dict, camp["player_map"])
 
         player_pids = list(camp["player_map"].keys())
-        unparsed_dates = [d for d in sorted_dates if d not in camp["parsed_by_date"]]
+        unparsed_dates = [d for d in disk_dates if d not in camp["parsed_by_date"]]
 
         if not unparsed_dates:
             return
 
         t0 = time.time()
         if len(unparsed_dates) <= 2:
-            boe.init_worker(self.loc_dict, player_pids, self.comp_icons)
+            boe.init_worker(self.loc_dict, player_pids, self.comp_icons, self.blocker_types)
             for d_str in unparsed_dates:
                 task = (0, 1, d_str, saves_by_date[d_str])
-                camp["parsed_by_date"][d_str] = boe.process_single_save(task)
+                snap = boe.process_single_save(task)
+                camp["parsed_by_date"][d_str] = snap
+                camp["human_pids"].update(snap.get("save_human_pids", []))
         else:
             max_workers = max(1, min(4, (os.cpu_count() or 4) - 1))
             tasks = [(i, len(unparsed_dates), d_str, saves_by_date[d_str]) for i, d_str in enumerate(unparsed_dates)]
             with ProcessPoolExecutor(
                 max_workers=max_workers,
                 initializer=boe.init_worker,
-                initargs=(self.loc_dict, player_pids, self.comp_icons)
+                initargs=(self.loc_dict, player_pids, self.comp_icons, self.blocker_types)
             ) as executor:
                 futures = {executor.submit(boe.process_single_save, t): t[2] for t in tasks}
                 for future in as_completed(futures):
                     d_str = futures[future]
-                    camp["parsed_by_date"][d_str] = future.result()
+                    snap = future.result()
+                    camp["parsed_by_date"][d_str] = snap
+                    camp["human_pids"].update(snap.get("save_human_pids", []))
 
-        ordered_results = [camp["parsed_by_date"][d] for d in sorted_dates if d in camp["parsed_by_date"]]
-        timeline_data = self._reconcile_results(
-            campaign_name,
-            camp["player_map"],
-            ordered_results,
-            camp["galaxy_map"]
+        # Use all cached dates (so prior saves & firsts survive even if old .sav files are removed)
+        all_sorted_dates = sorted(camp["parsed_by_date"].keys())
+        ordered_results = [camp["parsed_by_date"][d] for d in all_sorted_dates]
+
+        timeline_data = boe.reconcile_timeline_results(
+            campaign_name=campaign_name,
+            player_map=camp["player_map"],
+            results=ordered_results,
+            loc_dict=self.loc_dict,
+            tech_catalog=self.tech_catalog,
+            ui_icon_map=self.ui_icon_map,
+            galaxy_map=camp["galaxy_map"],
+            human_pids=camp["human_pids"],
+            include_last_updated=True
         )
 
         os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -220,288 +308,18 @@ class LiveCampaignIncrementalBuilder:
             json.dump(timeline_data, f, separators=(',', ':'), ensure_ascii=False)
 
         os.replace(temp_path, final_path)
+
+        total_notifs = len(timeline_data.get("notifications", []))
+        delta_notifs = max(0, total_notifs - camp["last_notif_count"])
+        camp["last_notif_count"] = total_notifs
+        self._save_disk_cache(backup_dir, camp)
+
         elapsed = time.time() - t0
+        alert_str = f" | Alerts: {total_notifs} (+{delta_notifs} new)" if delta_notifs else f" | Alerts: {total_notifs}"
         print(
             f"[{datetime.now().strftime('%H:%M:%S')}] [LIVE UPDATE] Added {len(unparsed_dates)} save(s) "
-            f"(Total: {len(ordered_results)} | Latest: {sorted_dates[-1]}) in {elapsed:.2f}s"
+            f"(Total: {len(ordered_results)} | Latest: {all_sorted_dates[-1]}{alert_str}) in {elapsed:.2f}s"
         )
-
-    def _reconcile_results(self, campaign_name, player_map, results, galaxy_map=None):
-        loc_dict = self.loc_dict
-        tech_catalog = self.tech_catalog
-
-        timeline_data = {
-            "campaign_name": campaign_name,
-            "last_updated": time.time(),
-            "icons": self.ui_icon_map,
-            "galaxy_map": galaxy_map or {},
-            "players": {}
-        }
-        for pid, pname in player_map.items():
-            timeline_data["players"][pid] = {
-                "name": pname,
-                "empire_name": pname,
-                "stats_history": [],
-                "empire_events": [],
-                "tech_events": [],
-                "planets": {}
-            }
-
-        build_orders = defaultdict(lambda: defaultdict(list))
-        seen_construction_ids = set()
-        planet_current_owners = {}
-        master_colony_map = {}
-        master_planet_names = {}
-        player_state = {}
-        empire_events = defaultdict(list)
-        tech_events = defaultdict(list)
-
-        def make_tech_event(date_str, t_key, level, is_starting):
-            t_meta = tech_catalog.get(t_key, {
-                "area": "physics",
-                "tier": 1,
-                "icon": "/gfx/interface/icons/research_icon.dds"
-            })
-            base_name = boe.clean_loc(t_key, loc_dict)
-            if level > 1:
-                base_name = f"{base_name} (Level {level})"
-            return {
-                "date": date_str,
-                "key": t_key,
-                "name": base_name,
-                "area": t_meta["area"],
-                "tier": t_meta["tier"],
-                "icon": t_meta["icon"],
-                "starting": is_starting
-            }
-
-        for res in results:
-            if not res:
-                continue
-            date = res["date"]
-
-            for pid, stat_obj in res["player_stats"].items():
-                if pid in timeline_data["players"]:
-                    timeline_data["players"][pid]["stats_history"].append(stat_obj)
-
-            for pid, emp_name in res["empire_names"].items():
-                if emp_name and pid in timeline_data["players"]:
-                    timeline_data["players"][pid]["empire_name"] = emp_name
-
-            for pid, prog in res["player_progression"].items():
-                if pid not in timeline_data["players"]:
-                    continue
-
-                if pid not in player_state:
-                    player_state[pid] = {
-                        "gov_type": prog["gov_type"],
-                        "authority": prog["authority"],
-                        "ethics": set(prog["ethics"]),
-                        "civics": set(prog["civics"]),
-                        "traditions": set(prog["traditions"]),
-                        "ascension_perks": set(prog["ascension_perks"]),
-                        "council_agenda": prog["council_agenda"],
-                        "cooldown_agendas": set(prog["cooldown_agendas"]),
-                        "finish_modifiers": set(prog["finish_modifiers"]),
-                        "techs": set(prog["techs"])
-                    }
-                    if prog["council_agenda"]:
-                        empire_events[pid].append({
-                            "date": date,
-                            "type": "AGENDA_SELECTED",
-                            "item": boe.clean_loc(prog["council_agenda"], loc_dict),
-                            "key": prog["council_agenda"]
-                        })
-                    for ag in prog["cooldown_agendas"]:
-                        empire_events[pid].append({
-                            "date": date,
-                            "type": "AGENDA_LAUNCHED",
-                            "item": boe.clean_loc(ag, loc_dict),
-                            "key": ag
-                        })
-                    for t in prog["traditions"]:
-                        empire_events[pid].append({
-                            "date": date,
-                            "type": "TRADITION",
-                            "item": boe.format_tradition_name(t, loc_dict),
-                            "key": t
-                        })
-                    for ap in prog["ascension_perks"]:
-                        empire_events[pid].append({
-                            "date": date,
-                            "type": "ASCENSION_PERK",
-                            "item": boe.clean_loc(ap, loc_dict),
-                            "key": ap
-                        })
-                    for t_key, lvl in prog["techs"]:
-                        tech_events[pid].append(make_tech_event(date, t_key, lvl, True))
-                else:
-                    st = player_state[pid]
-                    for t_tuple in prog["techs"]:
-                        if t_tuple not in st["techs"]:
-                            st["techs"].add(t_tuple)
-                            tech_events[pid].append(make_tech_event(date, t_tuple[0], t_tuple[1], False))
-
-                    for t in prog["traditions"]:
-                        if t not in st["traditions"]:
-                            st["traditions"].add(t)
-                            empire_events[pid].append({
-                                "date": date,
-                                "type": "TRADITION",
-                                "item": boe.format_tradition_name(t, loc_dict),
-                                "key": t
-                            })
-
-                    for ap in prog["ascension_perks"]:
-                        if ap not in st["ascension_perks"]:
-                            st["ascension_perks"].add(ap)
-                            empire_events[pid].append({
-                                "date": date,
-                                "type": "ASCENSION_PERK",
-                                "item": boe.clean_loc(ap, loc_dict),
-                                "key": ap
-                            })
-
-                    new_gov, new_auth = prog["gov_type"], prog["authority"]
-                    if (new_gov and new_gov != st["gov_type"]) or (new_auth and new_auth != st["authority"]):
-                        old_desc = boe.clean_loc(st["gov_type"] or st["authority"], loc_dict)
-                        new_desc = boe.clean_loc(new_gov or new_auth, loc_dict)
-                        if new_auth != st["authority"] and new_auth:
-                            new_desc = f"{new_desc} ({boe.clean_loc(new_auth, loc_dict)})"
-                        empire_events[pid].append({
-                            "date": date,
-                            "type": "GOV_CHANGED",
-                            "item": f"{old_desc} → {new_desc}",
-                            "key": new_gov or new_auth
-                        })
-                        st["gov_type"] = new_gov
-                        st["authority"] = new_auth
-
-                    curr_ethics = set(prog["ethics"])
-                    if curr_ethics and curr_ethics != st["ethics"]:
-                        added_raw = sorted(curr_ethics - st["ethics"])
-                        removed_raw = sorted(st["ethics"] - curr_ethics)
-                        added = [boe.clean_loc(e, loc_dict) for e in added_raw]
-                        removed = [boe.clean_loc(e, loc_dict) for e in removed_raw]
-                        parts = []
-                        if added: parts.append(f"+{', '.join(added)}")
-                        if removed: parts.append(f"-{', '.join(removed)}")
-                        empire_events[pid].append({
-                            "date": date,
-                            "type": "ETHICS_CHANGED",
-                            "item": " / ".join(parts),
-                            "key": added_raw[0] if added_raw else ""
-                        })
-                        st["ethics"] = curr_ethics
-
-                    curr_civics = set(prog["civics"])
-                    if curr_civics != st["civics"]:
-                        added_raw = sorted(curr_civics - st["civics"])
-                        removed_raw = sorted(st["civics"] - curr_civics)
-                        added = [boe.clean_loc(c, loc_dict) for c in added_raw]
-                        removed = [boe.clean_loc(c, loc_dict) for c in removed_raw]
-                        parts = []
-                        if added: parts.append(f"+{', '.join(added)}")
-                        if removed: parts.append(f"-{', '.join(removed)}")
-                        empire_events[pid].append({
-                            "date": date,
-                            "type": "CIVICS_CHANGED",
-                            "item": " / ".join(parts),
-                            "key": added_raw[0] if added_raw else ""
-                        })
-                        st["civics"] = curr_civics
-
-                    curr_cd_agendas = set(prog["cooldown_agendas"])
-                    newly_launched = set()
-                    for ag in (curr_cd_agendas - st["cooldown_agendas"]):
-                        newly_launched.add(ag)
-                        empire_events[pid].append({
-                            "date": date,
-                            "type": "AGENDA_LAUNCHED",
-                            "item": boe.clean_loc(ag, loc_dict),
-                            "key": ag
-                        })
-                    st["cooldown_agendas"] = curr_cd_agendas
-
-                    curr_mods = set(prog["finish_modifiers"])
-                    for mod in (curr_mods - st["finish_modifiers"]):
-                        ag_base = mod[:-7] if mod.endswith("_finish") else mod
-                        if ag_base not in newly_launched:
-                            empire_events[pid].append({
-                                "date": date,
-                                "type": "AGENDA_LAUNCHED",
-                                "item": boe.clean_loc(ag_base, loc_dict),
-                                "key": ag_base
-                            })
-                    st["finish_modifiers"] = curr_mods
-
-                    new_ag = prog["council_agenda"]
-                    if new_ag != st["council_agenda"]:
-                        if new_ag:
-                            empire_events[pid].append({
-                                "date": date,
-                                "type": "AGENDA_SELECTED",
-                                "item": boe.clean_loc(new_ag, loc_dict),
-                                "key": new_ag
-                            })
-                        st["council_agenda"] = new_ag
-
-            colony_map = res["colony_map"]
-            master_colony_map.update(colony_map)
-            master_planet_names.update(res["planet_names"])
-
-            for item_id, player_id, build_item, internal_colony_id in res["raw_queue_items"]:
-                true_planet_id = colony_map.get(
-                    internal_colony_id,
-                    master_colony_map.get(internal_colony_id, internal_colony_id)
-                )
-                if true_planet_id and item_id not in seen_construction_ids:
-                    seen_construction_ids.add(item_id)
-                    build_orders[player_id][true_planet_id].append((date, "BUILD", build_item))
-
-            for pid, new_owner in res["new_owners"].items():
-                old_owner = planet_current_owners.get(pid)
-                if old_owner != new_owner:
-                    if old_owner and old_owner != '4294967295' and new_owner != '4294967295':
-                        build_orders[old_owner][pid].append((date, "LOST", new_owner))
-                        build_orders[new_owner][pid].append((date, "TAKEN", old_owner))
-                    elif (not old_owner or old_owner == '4294967295') and new_owner != '4294967295':
-                        build_orders[new_owner][pid].append((date, "COLONIZED", None))
-                    planet_current_owners[pid] = new_owner
-
-        for pid, evts in empire_events.items():
-            if pid in timeline_data["players"]:
-                timeline_data["players"][pid]["empire_events"] = sorted(evts, key=lambda x: x["date"])
-
-        for pid, tevts in tech_events.items():
-            if pid in timeline_data["players"]:
-                timeline_data["players"][pid]["tech_events"] = sorted(tevts, key=lambda x: x["date"])
-
-        for pid, planets in build_orders.items():
-            if pid not in timeline_data["players"]:
-                continue
-            for planet_id, builds in planets.items():
-                raw_planet_name = master_planet_names.get(planet_id, f"Planet ID {planet_id}")
-                clean_builds = []
-                for event in sorted(builds, key=lambda x: x[0]):
-                    date, evt_type, evt_data = event
-                    if evt_type == "BUILD":
-                        clean_item = boe.clean_loc(evt_data, loc_dict)
-                        clean_builds.append({"date": date, "type": "BUILD", "item": clean_item, "key": evt_data})
-                    elif evt_type in ["TAKEN", "LOST"]:
-                        clean_builds.append({
-                            "date": date,
-                            "type": evt_type,
-                            "item": player_map.get(evt_data, f"AI/Entity {evt_data}")
-                        })
-                    elif evt_type == "COLONIZED":
-                        clean_builds.append({"date": date, "type": "COLONIZED", "item": None})
-                timeline_data["players"][pid]["planets"][planet_id] = {
-                    "name": raw_planet_name,
-                    "builds": clean_builds
-                }
-
-        return timeline_data
 
 
 def main():

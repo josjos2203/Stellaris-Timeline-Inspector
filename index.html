@@ -37,6 +37,8 @@
         .main-nav { display: flex; gap: 12px; border-bottom: 2px solid #333; padding-bottom: 10px; flex-wrap: wrap; }
         .main-nav-btn { background: #252526; border: 1px solid #444; color: #aaa; font-size: 1.05em; font-weight: bold; padding: 10px 22px; border-radius: 6px; display: flex; align-items: center; gap: 8px; }
         .main-nav-btn.active { background: #0e639c; color: #fff; border-color: #1177bb; box-shadow: 0 0 10px rgba(14, 99, 156, 0.4); }
+        .nav-badge { background: #3c3c3c; color: #dcdcaa; font-size: 0.78em; padding: 1px 7px; border-radius: 999px; font-family: monospace; }
+        .nav-badge.unread { background: #e53935; color: #fff; box-shadow: 0 0 8px rgba(229, 57, 53, 0.65); }
 
         .main-view { display: none; }
         .main-view.active { display: flex; }
@@ -60,6 +62,11 @@
         .ethic-chip { border-color: #dcdcaa; color: #dcdcaa; }
         .agenda-chip { border-color: #c586c0; color: #e0a9db; }
         .elim-chip { border-color: #f44336; color: #f44336; font-weight: bold; }
+        .war-chip { border-color: #ef5350; color: #ff8a80; background: #331919; font-weight: bold; }
+        .fed-chip { border-color: #e57373; color: #ffcdd2; background: #2d1b1e; font-weight: bold; }
+        .pact-chip { border-color: #ab47bc; color: #e1bee7; background: #271a2e; }
+        .treaty-chip { border-color: #4db6ac; color: #b2dfdb; background: #192928; }
+        .edict-chip { border-color: #4ec9b0; color: #80e5cf; background: #172826; }
         
         .resource-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
         .res-item { background: #1e1e1e; padding: 7px 10px; border-radius: 4px; border: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-size: 0.9em; }
@@ -68,6 +75,16 @@
         .res-item .val { font-family: monospace; color: #dcdcaa; font-size: 1.05em; }
         .res-item .net { font-family: monospace; color: #4caf50; font-size: 0.88em; margin-left: 6px; }
         .net.neg { color: #f44336; }
+
+        /* Left Panel Secondary Sections (Diplomacy, Edicts, Policies) */
+        .profile-subsection { margin-top: 12px; padding-top: 10px; border-top: 1px solid #363639; }
+        .profile-subsection h3 { margin: 0 0 8px 0; color: #9cdcfe; font-size: 0.88em; text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center; }
+        .policy-details summary { cursor: pointer; color: #9cdcfe; font-size: 0.88em; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; user-select: none; outline: none; padding: 2px 0; }
+        .policy-details summary:hover { color: #4ec9b0; }
+        .policy-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 8px; }
+        .policy-card { background: #1e1e1e; border: 1px solid #333; border-radius: 4px; padding: 5px 8px; font-size: 0.82em; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+        .policy-cat { color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .policy-val { color: #dcdcaa; font-weight: bold; text-align: right; }
         
         /* Sub-Tabs & Filter Bar */
         .tabs { display: flex; gap: 10px; margin-bottom: 12px; border-bottom: 1px solid #444; padding-bottom: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
@@ -77,6 +94,14 @@
         .filter-group { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
         .filter-btn { font-size: 0.78em; padding: 4px 8px; background: #2d2d30; border: 1px solid #444; color: #aaa; }
         .filter-btn.active { background: #0e639c; color: #fff; border-color: #1177bb; }
+        .filter-btn.notif-cat-btn { display: inline-flex; align-items: center; gap: 5px; transition: opacity 0.12s, background 0.12s, border-color 0.12s; }
+        .filter-btn.notif-cat-btn.active { background: #263544; border-color: #3d6d96; color: #e6f2ff; }
+        .filter-btn.notif-cat-btn.filtered-out { background: #1c1c1e; border-color: #38383c; color: #666; text-decoration: line-through; opacity: 0.65; }
+        .filter-btn.notif-cat-btn.filtered-out:hover { opacity: 0.9; color: #aaa; }
+        .filter-btn.notif-cat-btn .cat-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 7px; }
+        .filter-btn.notif-cat-btn.filtered-out .cat-dot { opacity: 0.25; }
+        .filter-btn.major-only { border-color: #7f2a2a; color: #ff9e9e; }
+        .filter-btn.major-only.active { background: #a82424; border-color: #ef4444; color: #fff; box-shadow: 0 0 8px rgba(239, 68, 68, 0.45); }
         .tab-content { display: none; flex-grow: 1; overflow-y: auto; min-height: 0; }
         .tab-content.active { display: block; }
         .tab-content.active.flex-tab { display: flex; flex-direction: column; overflow: hidden; }
@@ -87,12 +112,20 @@
         .date-badge { color: #dcdcaa; font-family: monospace; }
         .src-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.8em; background: #2d2d30; color: #aaa; border: 1px solid #444; }
         .src-badge.empire { background: #2a2235; color: #c586c0; border-color: #553b6e; font-weight: bold; }
+        .src-badge.diplomacy { background: #331c29; color: #f48fb1; border-color: #7b3556; font-weight: bold; }
         .src-badge.physics { background: #162c46; color: #6cb6ff; border-color: #2c588a; font-weight: bold; }
         .src-badge.society { background: #173826; color: #6ad48b; border-color: #2b6b47; font-weight: bold; }
         .src-badge.engineering { background: #422b14; color: #f2a65a; border-color: #805326; font-weight: bold; }
         .tier-badge { font-family: monospace; font-size: 0.78em; padding: 1px 5px; border-radius: 3px; background: #333; color: #dcdcaa; border: 1px solid #555; }
 
         .item-build { color: #9cdcfe; font-weight: bold; }
+        .item-blocker { color: #f0ad4e; font-weight: bold; }
+        .item-edict { color: #56d6b8; font-weight: bold; }
+        .item-edict-off { color: #8c9ea3; font-style: italic; }
+        .item-policy { color: #dcdcaa; font-weight: bold; }
+        .item-war { color: #ff6b6b; font-weight: bold; }
+        .item-fed { color: #ff8a80; font-weight: bold; }
+        .item-pact { color: #ce93d8; font-weight: bold; }
         .item-conquest { color: #4caf50; font-style: italic; font-weight: bold; }
         .item-loss { color: #f44336; font-style: italic; font-weight: bold; }
         .item-tradition { color: #c586c0; font-weight: bold; }
@@ -159,6 +192,11 @@
         .vt-node img { width: 24px; height: 24px; object-fit: contain; pointer-events: none; }
         .vt-node.colonized { border-color: #4caf50; background: #132218; }
         .vt-node.lost { border-color: #f44336; background: #291414; }
+        .vt-node.blocker { border-color: #f0ad4e; background: #261e12; }
+        .vt-node.edict { border-color: #56d6b8; background: #122422; }
+        .vt-node.policy { border-color: #dcdcaa; background: #24241a; }
+        .vt-node.war { border-color: #ef5350; background: #2e1414; }
+        .vt-node.pact { border-color: #ab47bc; background: #26142c; }
         .vt-node.tradition { border-color: #c586c0; background: #221626; }
         .vt-node.perk { border-color: #ffd700; background: #262112; }
         .vt-node.agenda { border-color: #4ec9b0; background: #122421; }
@@ -256,6 +294,69 @@
         .lb-bar.tech { background: rgba(86, 156, 214, 0.2); }
         .lb-val { position: relative; z-index: 1; font-family: monospace; font-weight: bold; }
 
+        /* Live Notifications View */
+        .notif-panel { background: #252526; padding: 20px; border-radius: 6px; border: 1px solid #333; width: 100%; display: flex; flex-direction: column; gap: 14px; height: 690px; box-sizing: border-box; }
+        .notif-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid #38383b; padding-bottom: 12px; }
+        .notif-filters { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .notif-right-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .notif-feed { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+        .notif-card {
+            display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+            border-radius: 6px; border: 1px solid #3c3c40; border-left: 5px solid #888;
+            background: #1d1e21; transition: background 0.12s ease;
+        }
+        .notif-card:hover { background: #26282d; }
+        .notif-icon-wrap {
+            width: 34px; height: 34px; border-radius: 5px; background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center;
+            justify-content: center; flex: 0 0 34px;
+        }
+        .notif-icon-wrap img { width: 24px; height: 24px; object-fit: contain; }
+        .notif-body { flex: 1; min-width: 0; }
+        .notif-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 3px; }
+        .notif-date { font-family: monospace; font-size: 0.86em; color: #dcdcaa; }
+        .notif-title { font-weight: bold; font-size: 0.94em; letter-spacing: 0.2px; }
+        .notif-first-tag {
+            font-size: 0.7em; font-weight: bold; padding: 1px 6px; border-radius: 3px;
+            background: rgba(255, 215, 0, 0.18); border: 1px solid #ffd700; color: #ffd700;
+            letter-spacing: 0.5px; text-transform: uppercase;
+        }
+        .notif-msg { font-size: 0.95em; color: #e4e4e4; line-height: 1.35; }
+        .notif-players { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
+        .notif-player-btn {
+            font-size: 0.78em; padding: 3px 8px; border-radius: 4px;
+            background: #2b2d32; border: 1px solid #4c5059; color: #9cdcfe;
+        }
+        .notif-player-btn:hover { background: #0e639c; color: #fff; border-color: #1177bb; }
+
+        /* Notification Color Themes */
+        .notif-color-red { border-left-color: #ef4444; background: linear-gradient(90deg, rgba(239, 68, 68, 0.16) 0%, #1d1e21 45%); }
+        .notif-color-red .notif-title { color: #ff7b7b; }
+
+        .notif-color-purple { border-left-color: #a855f7; background: linear-gradient(90deg, rgba(168, 85, 247, 0.16) 0%, #1d1e21 45%); }
+        .notif-color-purple .notif-title { color: #d8a6ff; }
+
+        .notif-color-orange { border-left-color: #f97316; background: linear-gradient(90deg, rgba(249, 115, 22, 0.16) 0%, #1d1e21 45%); }
+        .notif-color-orange .notif-title { color: #ffb36b; }
+
+        .notif-color-green { border-left-color: #22c55e; background: linear-gradient(90deg, rgba(34, 197, 94, 0.14) 0%, #1d1e21 45%); }
+        .notif-color-green .notif-title { color: #5ad886; }
+
+        .notif-color-light_green { border-left-color: #86efac; background: linear-gradient(90deg, rgba(134, 239, 172, 0.22) 0%, #1d1e21 48%); }
+        .notif-color-light_green .notif-title { color: #b7f7ce; }
+
+        .notif-color-blue { border-left-color: #3b82f6; background: linear-gradient(90deg, rgba(59, 130, 246, 0.2) 0%, #1d1e21 48%); }
+        .notif-color-blue .notif-title { color: #7bb5ff; }
+
+        .notif-color-light_blue { border-left-color: #7dd3fc; background: linear-gradient(90deg, rgba(125, 211, 252, 0.15) 0%, #1d1e21 45%); }
+        .notif-color-light_blue .notif-title { color: #bae6fd; }
+
+        .notif-color-yellow { border-left-color: #eab308; background: linear-gradient(90deg, rgba(234, 179, 8, 0.15) 0%, #1d1e21 45%); }
+        .notif-color-yellow .notif-title { color: #fde047; }
+
+        .notif-color-amber { border-left-color: #f59e0b; background: linear-gradient(90deg, rgba(245, 158, 11, 0.18) 0%, #1d1e21 45%); }
+        .notif-color-amber .notif-title { color: #fcd34d; }
+
         /* Galaxy & Spawn Map View */
         .map-layout { display: flex; gap: 20px; width: 100%; height: 690px; }
         .map-canvas-wrap { position: relative; flex: 1; background: radial-gradient(circle at center, #0a1218 0%, #050709 100%); border: 1px solid #333; border-radius: 6px; overflow: hidden; }
@@ -279,10 +380,10 @@
             body { padding: 12px; background-color: #1e1e1e !important; color: #d4d4d4 !important; }
             #landing, .header-actions, .main-nav, #timeline-slider, #live-follow-pill,
             .filter-group, .map-overlay-bar, #lb-search, #lb-filter-active, #player-select,
-            .vt-tooltip { display: none !important; }
+            .notif-toolbar, .notif-players, .vt-tooltip { display: none !important; }
             .scrubber-panel { padding: 8px 12px; margin-bottom: 10px; }
             .dashboard { flex-direction: column !important; height: auto !important; gap: 14px; }
-            .panel, .leaderboard-panel, .tab-content, .tab-content.active.flex-tab {
+            .panel, .leaderboard-panel, .notif-panel, .notif-feed, .tab-content, .tab-content.active.flex-tab {
                 height: auto !important; max-height: none !important; overflow: visible !important;
             }
             .tab-btn:not(.active) { display: none !important; }
@@ -292,7 +393,7 @@
             #galaxy-canvas { display: none !important; }
             #map-print-img { display: block !important; }
             .map-sidebar { width: auto !important; overflow: visible !important; }
-            .fleet-box, .ship-group, .lb-row { break-inside: avoid; }
+            .fleet-box, .ship-group, .lb-row, .notif-card { break-inside: avoid; }
         }
     </style>
 </head>
@@ -339,6 +440,7 @@
         <div class="main-nav">
             <button id="nav-empire-btn" class="main-nav-btn active" onclick="switchMainView('view-empire', this)">🏛️ Empire Inspector</button>
             <button id="nav-lb-btn" class="main-nav-btn" onclick="switchMainView('view-leaderboard', this)">🏆 Live Leaderboard</button>
+            <button id="nav-notif-btn" class="main-nav-btn" onclick="switchMainView('view-notifications', this)">🔔 Live Notifications <span id="notif-nav-badge" class="nav-badge">0</span></button>
             <button id="nav-map-btn" class="main-nav-btn" onclick="switchMainView('view-map', this)">🌌 Galaxy &amp; Spawn Map</button>
         </div>
         
@@ -363,6 +465,23 @@
                 
                 <h3 style="margin: 6px 0 8px 0; color: #888; font-size: 0.92em;">Resource Stockpile / Monthly Net</h3>
                 <div class="resource-grid" id="emp-resources"></div>
+
+                <div class="profile-subsection">
+                    <h3>Diplomacy &amp; Active Wars</h3>
+                    <div class="traits-box" id="emp-diplomacy"></div>
+                </div>
+
+                <div class="profile-subsection">
+                    <h3>Active Edicts <span id="emp-edicts-count" style="color:#777; font-weight:normal;"></span></h3>
+                    <div class="traits-box" id="emp-edicts"></div>
+                </div>
+
+                <div class="profile-subsection">
+                    <details id="emp-policies-details" class="policy-details">
+                        <summary id="emp-policies-summary">Active Policies (0)</summary>
+                        <div class="policy-grid" id="emp-policies"></div>
+                    </details>
+                </div>
             </div>
             
             <!-- RIGHT PANEL: PLAYER SUB-TABS -->
@@ -377,8 +496,10 @@
                     <!-- Feed Filters -->
                     <div class="filter-group" id="feed-filters">
                         <button class="filter-btn active" onclick="setFeedFilter('ALL', this)">All</button>
-                        <button class="filter-btn" onclick="setFeedFilter('EMPIRE', this)">Empire Events</button>
-                        <button class="filter-btn" onclick="setFeedFilter('PLANET', this)">Planet Builds</button>
+                        <button class="filter-btn" onclick="setFeedFilter('EMPIRE', this)">Empire</button>
+                        <button class="filter-btn" onclick="setFeedFilter('DIPLO', this)">Diplomacy</button>
+                        <button class="filter-btn" onclick="setFeedFilter('EDICT_POLICY', this)">Edicts &amp; Policies</button>
+                        <button class="filter-btn" onclick="setFeedFilter('PLANET', this)">Planets</button>
                     </div>
                     <!-- Visual Timeline Controls -->
                     <div class="filter-group" id="visual-timeline-controls" style="display:none;">
@@ -408,7 +529,7 @@
                         <div class="vt-stage" id="vt-stage"></div>
                     </div>
                     <div class="vt-detail-bar" id="vt-detail-bar">
-                        <span style="color:#888;">Hover over any icon to inspect builds or techs, or click an icon to pin its details here.</span>
+                        <span style="color:#888;">Hover over any icon to inspect builds, blockers, edicts, policies, diplomacy, or techs — click to pin here.</span>
                     </div>
                 </div>
 
@@ -453,7 +574,33 @@
             </div>
         </div>
 
-        <!-- VIEW 3: STATIC GALAXY & SPAWN MAP -->
+        <!-- VIEW 3: LIVE NOTIFICATIONS -->
+        <div id="view-notifications" class="main-view">
+            <div class="notif-panel">
+                <div class="notif-toolbar">
+                    <div class="notif-filters" id="notif-cat-filters">
+                        <button type="button" class="filter-btn active" id="btn-notif-all" onclick="resetNotifFilters()" title="Show all categories">All</button>
+                        <button type="button" class="filter-btn major-only" id="btn-notif-major" aria-pressed="false" onclick="toggleNotifMajorOnly()" title="Toggle Major (Red) alerts only">Major (Red)</button>
+                        <button type="button" class="filter-btn notif-cat-btn active" data-cat="diplomacy" aria-pressed="true" onclick="toggleNotifCategory('diplomacy', event)" oncontextmenu="soloNotifCategory('diplomacy', event)" title="Click to hide/show · Right-click to solo"><span class="cat-dot" style="background:#a855f7;"></span>Diplomacy</button>
+                        <button type="button" class="filter-btn notif-cat-btn active" data-cat="military" aria-pressed="true" onclick="toggleNotifCategory('military', event)" oncontextmenu="soloNotifCategory('military', event)" title="Click to hide/show · Right-click to solo"><span class="cat-dot" style="background:#ef4444;"></span>Military</button>
+                        <button type="button" class="filter-btn notif-cat-btn active" data-cat="ascension" aria-pressed="true" onclick="toggleNotifCategory('ascension', event)" oncontextmenu="soloNotifCategory('ascension', event)" title="Click to hide/show · Right-click to solo"><span class="cat-dot" style="background:#f97316;"></span>Ascension</button>
+                        <button type="button" class="filter-btn notif-cat-btn active" data-cat="tech" aria-pressed="true" onclick="toggleNotifCategory('tech', event)" oncontextmenu="soloNotifCategory('tech', event)" title="Click to hide/show · Right-click to solo"><span class="cat-dot" style="background:#22c55e;"></span>Techs</button>
+                        <button type="button" class="filter-btn notif-cat-btn active" data-cat="milestones" aria-pressed="true" onclick="toggleNotifCategory('milestones', event)" oncontextmenu="soloNotifCategory('milestones', event)" title="Click to hide/show · Right-click to solo"><span class="cat-dot" style="background:#3b82f6;"></span>Milestones</button>
+                        <button type="button" class="filter-btn notif-cat-btn active" data-cat="government" aria-pressed="true" onclick="toggleNotifCategory('government', event)" oncontextmenu="soloNotifCategory('government', event)" title="Click to hide/show · Right-click to solo"><span class="cat-dot" style="background:#eab308;"></span>Gov / Ethics</button>
+                        <button type="button" class="filter-btn notif-cat-btn active" data-cat="deficits" aria-pressed="true" onclick="toggleNotifCategory('deficits', event)" oncontextmenu="soloNotifCategory('deficits', event)" title="Click to hide/show · Right-click to solo"><span class="cat-dot" style="background:#f59e0b;"></span>Deficits</button>
+                    </div>
+                    <div class="notif-right-controls">
+                        <button type="button" class="filter-btn" id="btn-notif-firsts" aria-pressed="false" onclick="toggleNotifFirsts(this)">★ Firsts Only</button>
+                        <button type="button" class="filter-btn active" id="btn-notif-order" onclick="toggleNotifOrder(this)">Newest First</button>
+                        <input type="text" id="notif-search" placeholder="Filter player or event..." oninput="renderNotifications()" style="width:190px; font-size:0.88em; padding:5px 9px;">
+                        <span id="notif-count-label" style="font-size:0.84em; color:#888;"></span>
+                    </div>
+                </div>
+                <div class="notif-feed" id="notif-feed"></div>
+            </div>
+        </div>
+
+        <!-- VIEW 4: STATIC GALAXY & SPAWN MAP -->
         <div id="view-map" class="main-view">
             <div class="map-layout">
                 <div class="map-canvas-wrap">
@@ -534,6 +681,22 @@
         let lbSortAsc = false;
         let lbActiveOnly = true;
 
+        // Live Notifications state
+        const ALL_NOTIF_CATS = ['diplomacy', 'military', 'ascension', 'tech', 'milestones', 'government', 'deficits'];
+        let hiddenNotifCats = new Set();
+        let notifMajorOnly = false;
+        let notifFirstsOnly = false;
+        let notifNewestFirst = true;
+        let lastSeenNotifCount = 0;
+        let unreadNotifCount = 0;
+
+        try {
+            const savedHidden = JSON.parse(localStorage.getItem('sti_hidden_notif_cats') || '[]');
+            if (Array.isArray(savedHidden)) {
+                hiddenNotifCats = new Set(savedHidden.filter(c => ALL_NOTIF_CATS.includes(c)));
+            }
+        } catch (_) {}
+
         // Visual Build Timeline state
         let vtZoom = 44; // pixels per year
         let vtShowEmpireRow = true;
@@ -542,6 +705,16 @@
         let vtSelectedKey = null;
 
         const closedFleetNames = new Set();
+
+        const DIPLO_EVENT_TYPES = new Set([
+            'WAR_STARTED', 'WAR_ENDED',
+            'FEDERATION_FORMED', 'FEDERATION_JOINED', 'FEDERATION_LEFT', 'FEDERATION_DISBANDED',
+            'DEFENSIVE_PACT_FORMED', 'DEFENSIVE_PACT_BROKEN',
+            'NAP_FORMED', 'NAP_BROKEN'
+        ]);
+        const EDICT_POLICY_EVENT_TYPES = new Set([
+            'EDICT_ACTIVATED', 'EDICT_REMOVED', 'POLICY_CHANGED'
+        ]);
 
         // Reliable DDS Cache & Concurrency Queue
         const ddsUrlCache = new Map();
@@ -769,7 +942,7 @@
 
         function getIconPath(name) {
             if (!timelineData || !timelineData.icons || !name) return "";
-            return timelineData.icons[name] || "";
+            return timelineData.icons[name] || timelineData.icons[String(name).toLowerCase()] || "";
         }
 
         function escapeHtml(str) {
@@ -795,6 +968,17 @@
 
         function formatEventLabel(ev) {
             if (ev.type === "TECH") return { text: ev.item, cls: `item-tech-${ev.area || 'physics'}` };
+            if (ev.type === "BLOCKER_REMOVED") return { text: `Cleared Blocker: ${ev.item}`, cls: "item-blocker" };
+            if (ev.type === "EDICT_ACTIVATED") return { text: `Edict Activated: ${ev.item}`, cls: "item-edict" };
+            if (ev.type === "EDICT_REMOVED") return { text: `Edict Deactivated: ${ev.item}`, cls: "item-edict-off" };
+            if (ev.type === "POLICY_CHANGED") return { text: `Policy: ${ev.item}`, cls: "item-policy" };
+            if (ev.type === "WAR_STARTED" || ev.type === "WAR_ENDED") return { text: ev.item, cls: "item-war" };
+            if (ev.type === "FEDERATION_FORMED" || ev.type === "FEDERATION_JOINED" || ev.type === "FEDERATION_LEFT" || ev.type === "FEDERATION_DISBANDED") {
+                return { text: ev.item, cls: "item-fed" };
+            }
+            if (ev.type === "DEFENSIVE_PACT_FORMED" || ev.type === "DEFENSIVE_PACT_BROKEN" || ev.type === "NAP_FORMED" || ev.type === "NAP_BROKEN") {
+                return { text: ev.item, cls: "item-pact" };
+            }
             if (ev.type === "COLONIZED") return { text: "Colonized / Settled", cls: "item-conquest" };
             if (ev.type === "TAKEN") return { text: `Conquered from ${ev.item}`, cls: "item-conquest" };
             if (ev.type === "LOST") return { text: `Lost to ${ev.item}`, cls: "item-loss" };
@@ -820,6 +1004,20 @@
                     if (byItem) return byItem;
                 }
                 if (ev.type === "TECH") return `/gfx/interface/icons/resources/${ev.area || 'physics'}_research.dds`;
+                if (ev.type === "BLOCKER_REMOVED") return "/gfx/interface/icons/planet.dds";
+                if (ev.type === "EDICT_ACTIVATED" || ev.type === "EDICT_REMOVED") return "/gfx/interface/icons/menu_icon_edicts.dds";
+                if (ev.type === "POLICY_CHANGED") return "/gfx/interface/icons/menu_icon_policies.dds";
+                if (ev.type === "WAR_STARTED") return "/gfx/interface/icons/diplomacy/diplomacy_war.dds";
+                if (ev.type === "WAR_ENDED") return "/gfx/interface/icons/diplomacy/diplomacy_truce.dds";
+                if (ev.type === "FEDERATION_FORMED" || ev.type === "FEDERATION_JOINED" || ev.type === "FEDERATION_LEFT" || ev.type === "FEDERATION_DISBANDED") {
+                    return "/gfx/interface/icons/diplomacy/diplomacy_federation.dds";
+                }
+                if (ev.type === "DEFENSIVE_PACT_FORMED" || ev.type === "DEFENSIVE_PACT_BROKEN") {
+                    return "/gfx/interface/icons/diplomacy/diplomacy_defensive_pact.dds";
+                }
+                if (ev.type === "NAP_FORMED" || ev.type === "NAP_BROKEN") {
+                    return "/gfx/interface/icons/diplomacy/diplomacy_nonaggression.dds";
+                }
                 if (ev.type === "COLONIZED") return "/gfx/interface/icons/icon_colony_ship.dds";
                 if (ev.type === "TAKEN") return "/gfx/interface/icons/occupation_flag.dds";
                 if (ev.type === "LOST") return "/gfx/interface/icons/planet_invasion.dds";
@@ -840,7 +1038,187 @@
             return "/gfx/interface/icons/building_icon.dds";
         }
 
-        // --- VISUAL BUILD TIMELINE (SWIMLANE VIEW WITH TECH & BUILDING ICONS) ---
+        // --- LIVE NOTIFICATIONS TAB ---
+        function getNotifBucket(n) {
+            if (n.type === 'ECON_MILESTONE') return 'milestones';
+            if (n.type === 'DEFICIT') return 'deficits';
+            return n.category || 'diplomacy';
+        }
+
+        function notifMatchesCasterFilters(n) {
+            if (notifFirstsOnly && !n.is_first) return false;
+            if (notifMajorOnly && n.color !== 'red') return false;
+            if (hiddenNotifCats.has(getNotifBucket(n))) return false;
+            return true;
+        }
+
+        function saveNotifFilterPrefs() {
+            try {
+                localStorage.setItem('sti_hidden_notif_cats', JSON.stringify(Array.from(hiddenNotifCats)));
+            } catch (_) {}
+        }
+
+        function syncNotifFilterButtons() {
+            const allBtn = document.getElementById('btn-notif-all');
+            if (allBtn) {
+                allBtn.classList.toggle('active', hiddenNotifCats.size === 0 && !notifMajorOnly);
+            }
+            const majorBtn = document.getElementById('btn-notif-major');
+            if (majorBtn) {
+                majorBtn.classList.toggle('active', notifMajorOnly);
+                majorBtn.setAttribute('aria-pressed', String(notifMajorOnly));
+            }
+            document.querySelectorAll('#notif-cat-filters .notif-cat-btn').forEach(btn => {
+                const cat = btn.dataset.cat;
+                const isShown = !hiddenNotifCats.has(cat);
+                btn.classList.toggle('active', isShown);
+                btn.classList.toggle('filtered-out', !isShown);
+                btn.setAttribute('aria-pressed', String(isShown));
+            });
+        }
+
+        function resetNotifFilters() {
+            hiddenNotifCats.clear();
+            notifMajorOnly = false;
+            saveNotifFilterPrefs();
+            syncNotifFilterButtons();
+            renderNotifications();
+            updateNotifBadge(globalDates[parseInt(document.getElementById('timeline-slider').value, 10)] || '');
+        }
+
+        function toggleNotifMajorOnly() {
+            notifMajorOnly = !notifMajorOnly;
+            syncNotifFilterButtons();
+            renderNotifications();
+            updateNotifBadge(globalDates[parseInt(document.getElementById('timeline-slider').value, 10)] || '');
+        }
+
+        function toggleNotifCategory(cat, ev) {
+            if (ev && ev.shiftKey) {
+                soloNotifCategory(cat, ev);
+                return;
+            }
+            if (hiddenNotifCats.has(cat)) hiddenNotifCats.delete(cat);
+            else hiddenNotifCats.add(cat);
+            saveNotifFilterPrefs();
+            syncNotifFilterButtons();
+            renderNotifications();
+            updateNotifBadge(globalDates[parseInt(document.getElementById('timeline-slider').value, 10)] || '');
+        }
+
+        function soloNotifCategory(cat, ev) {
+            if (ev) ev.preventDefault();
+            const isAlreadySolo = !hiddenNotifCats.has(cat) && hiddenNotifCats.size === ALL_NOTIF_CATS.length - 1;
+            hiddenNotifCats.clear();
+            if (!isAlreadySolo) {
+                ALL_NOTIF_CATS.forEach(c => { if (c !== cat) hiddenNotifCats.add(c); });
+            }
+            saveNotifFilterPrefs();
+            syncNotifFilterButtons();
+            renderNotifications();
+            updateNotifBadge(globalDates[parseInt(document.getElementById('timeline-slider').value, 10)] || '');
+        }
+
+        function toggleNotifFirsts(btn) {
+            notifFirstsOnly = !notifFirstsOnly;
+            btn.classList.toggle('active', notifFirstsOnly);
+            btn.setAttribute('aria-pressed', String(notifFirstsOnly));
+            renderNotifications();
+            updateNotifBadge(globalDates[parseInt(document.getElementById('timeline-slider').value, 10)] || '');
+        }
+
+        function toggleNotifOrder(btn) {
+            notifNewestFirst = !notifNewestFirst;
+            btn.classList.toggle('active', notifNewestFirst);
+            btn.textContent = notifNewestFirst ? 'Newest First' : 'Oldest First';
+            renderNotifications();
+        }
+
+        function updateNotifBadge(currentDate) {
+            const badge = document.getElementById('notif-nav-badge');
+            if (!badge || !timelineData) return;
+            const visibleCount = (timelineData.notifications || [])
+                .filter(n => (!currentDate || n.date <= currentDate) && notifMatchesCasterFilters(n)).length;
+            if (unreadNotifCount > 0) {
+                badge.textContent = `+${unreadNotifCount}`;
+                badge.classList.add('unread');
+            } else {
+                badge.textContent = String(visibleCount);
+                badge.classList.remove('unread');
+            }
+        }
+
+        function renderNotifications() {
+            const feed = document.getElementById('notif-feed');
+            if (!feed || !timelineData) return;
+
+            const slider = document.getElementById('timeline-slider');
+            const currentDate = globalDates[parseInt(slider.value, 10)] || '';
+            const query = (document.getElementById('notif-search')?.value || '').trim().toLowerCase();
+
+            const allAtDate = (timelineData.notifications || []).filter(n => !currentDate || n.date <= currentDate);
+            let filtered = allAtDate.filter(n => {
+                if (!notifMatchesCasterFilters(n)) return false;
+                if (query) {
+                    const hay = `${n.title} ${n.message} ${n.date}`.toLowerCase();
+                    if (!hay.includes(query)) return false;
+                }
+                return true;
+            });
+
+            if (notifNewestFirst) {
+                filtered = filtered.slice().reverse();
+            }
+
+            const countLbl = document.getElementById('notif-count-label');
+            if (countLbl) {
+                const hiddenNote = hiddenNotifCats.size > 0 ? ` (${hiddenNotifCats.size} hidden)` : '';
+                countLbl.textContent = `${filtered.length} / ${allAtDate.length} alerts${hiddenNote}`;
+            }
+
+            if (filtered.length === 0) {
+                feed.innerHTML = `<div style="padding:28px; text-align:center; color:#888;">
+                    No alerts matching your active filters up to ${escapeHtml(currentDate || 'this date')}.
+                </div>`;
+                return;
+            }
+
+            feed.innerHTML = filtered.map(n => {
+                const colorClass = `notif-color-${n.color || 'blue'}`;
+                const iconPath = n.icon || '/gfx/interface/icons/research_icon.dds';
+                const firstTag = n.is_first ? `<span class="notif-first-tag">★ Galaxy First</span>` : '';
+                const playerBtns = (n.players || [])
+                    .filter(pid => timelineData.players && timelineData.players[pid])
+                    .slice(0, 4)
+                    .map(pid => {
+                        const pname = timelineData.players[pid].name;
+                        return `<button class="notif-player-btn" onclick="jumpToPlayer('${escapeHtml(pid)}')" title="Inspect ${escapeHtml(pname)}">${escapeHtml(pname)}</button>`;
+                    }).join('');
+
+                return `
+                    <div class="notif-card ${colorClass}">
+                        <div class="notif-icon-wrap">
+                            <img data-dds="${escapeHtml(iconPath)}" alt="">
+                        </div>
+                        <div class="notif-body">
+                            <div class="notif-head">
+                                <span class="notif-date">[${escapeHtml(n.date)}]</span>
+                                <span class="notif-title">${escapeHtml(n.title)}</span>
+                                ${firstTag}
+                            </div>
+                            <div class="notif-msg">${escapeHtml(n.message)}</div>
+                        </div>
+                        ${playerBtns ? `<div class="notif-players">${playerBtns}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            hydrateDdsImages(feed);
+        }
+
+        syncNotifFilterButtons();
+
+        // --- VISUAL BUILD TIMELINE (SWIMLANE VIEW WITH TECH, BLOCKER, EDICT, POLICY & DIPLO ICONS) ---
         function setVtZoom(val) {
             vtZoom = parseInt(val, 10) || 44;
             updateView(true);
@@ -864,13 +1242,18 @@
             }
             const types = new Set(events.map(e => e.type));
             if (rowType === 'empire') {
+                if (types.has('WAR_STARTED') || types.has('WAR_ENDED') || types.has('FEDERATION_FORMED') || types.has('FEDERATION_DISBANDED')) return 'war';
+                if (types.has('DEFENSIVE_PACT_FORMED') || types.has('DEFENSIVE_PACT_BROKEN') || types.has('NAP_FORMED') || types.has('NAP_BROKEN')) return 'pact';
                 if (types.has('ASCENSION_PERK')) return 'perk';
                 if (types.has('TRADITION')) return 'tradition';
                 if (types.has('AGENDA_LAUNCHED') || types.has('AGENDA_SELECTED')) return 'agenda';
+                if (types.has('EDICT_ACTIVATED') || types.has('EDICT_REMOVED')) return 'edict';
+                if (types.has('POLICY_CHANGED')) return 'policy';
                 return 'gov';
             }
             if (types.has('LOST')) return 'lost';
             if (types.has('COLONIZED') || types.has('TAKEN')) return 'colonized';
+            if (types.has('BLOCKER_REMOVED') && !types.has('BUILD')) return 'blocker';
             return '';
         }
 
@@ -937,7 +1320,11 @@
                     stemHtml = `<div class="vt-stem" style="left:${x}px; top:50%; height:24%;"></div>`;
                 }
 
-                const primaryEv = evList.find(e => e.type === 'BUILD' || e.type === 'TECH' || e.type === 'ASCENSION_PERK' || e.type === 'TRADITION') || evList[0];
+                const primaryEv = evList.find(e =>
+                    e.type === 'BUILD' || e.type === 'BLOCKER_REMOVED' || e.type === 'TECH' ||
+                    e.type === 'WAR_STARTED' || e.type === 'FEDERATION_FORMED' ||
+                    e.type === 'ASCENSION_PERK' || e.type === 'TRADITION'
+                ) || evList[0];
                 const iconPath = resolveEventIcon(primaryEv);
                 const tCls = getTickClass(evList, rowType);
                 const selCls = (vtSelectedKey === key) ? ' selected' : '';
@@ -1014,7 +1401,7 @@
                     const nodesHtml = renderRowNodes(byDate, 'EMPIRE', 'Empire Events', 'empire', baseYear, leftPad);
                     rowsHtml += `
                         <div class="vt-row empire-row">
-                            <div class="vt-planet-label" style="left:${leftPad - 138}px;" title="Empire Milestones (Traditions, Perks, Agendas, Reforms)">EMPIRE</div>
+                            <div class="vt-planet-label" style="left:${leftPad - 138}px;" title="Empire Milestones (Traditions, Perks, Agendas, Edicts, Policies, Diplomacy, Reforms)">EMPIRE</div>
                             <div class="vt-bar" style="left:${leftPad}px; width:${fullBarW}px;"></div>
                             ${nodesHtml}
                         </div>
@@ -1259,7 +1646,7 @@
                 if (conflictCount > 0) {
                     const items = data.conflict_system_ids.map(id => {
                         const s = sysById.get(id);
-                        return s ? `<li><strong style="color:#ff6b6b;">${s.name}</strong> (#${s.id}): ${(s.claimed_by || []).join(' vs. ')}</li>` : '';
+                        return s ? `<li><strong style="color:#ff6b6b;">${escapeHtml(s.name)}</strong> (#${s.id}): ${escapeHtml((s.claimed_by || []).join(' vs. '))}</li>` : '';
                     }).join('');
                     conflictBox.innerHTML = `<div class="map-section-title" style="color:#ff6b6b;">⚠️ Illegal Spawn Collisions (${conflictCount})</div>
                         <ul style="margin:0; padding-left:18px; font-size:0.82em; color:#ccc;">${items}</ul>`;
@@ -1513,26 +1900,26 @@
                 }
                 const badges = [];
                 if (sys.is_homeworld) {
-                    const who = sys.owner ? `${sys.owner.player} (${sys.owner.empire})` : 'Homeworld';
+                    const who = sys.owner ? `${escapeHtml(sys.owner.player)} (${escapeHtml(sys.owner.empire)})` : 'Homeworld';
                     badges.push(`<div>🏠 <strong style="color:#ffd700;">Homeworld:</strong> ${who}</div>`);
                 }
                 if (sys.is_t1_t2) badges.push(`<div>🪐 <strong style="color:#ff9800;">Guaranteed Neighbor (T1/T2 Colony)</strong></div>`);
                 if (sys.is_fe) badges.push(`<div>🏛️ <strong style="color:#fff;">Fallen Empire System</strong></div>`);
                 if (sys.is_marauder) badges.push(`<div>🏴‍☠️ <strong style="color:#ff4081;">Marauder System</strong></div>`);
-                if (sys.enclave) badges.push(`<div>🛰️ <strong style="color:#4ec9b0;">Enclave:</strong> ${sys.enclave.toUpperCase()}</div>`);
+                if (sys.enclave) badges.push(`<div>🛰️ <strong style="color:#4ec9b0;">Enclave:</strong> ${escapeHtml(sys.enclave.toUpperCase())}</div>`);
                 if (sys.wanderlust && sys.wanderlust.length > 0) {
                     const wLabels = sys.wanderlust.map(w => WANDERLUST_META[w]?.label || w).join(', ');
-                    badges.push(`<div>✨ <strong style="color:#00ffff;">Wanderlust POI:</strong> ${wLabels}</div>`);
+                    badges.push(`<div>✨ <strong style="color:#00ffff;">Wanderlust POI:</strong> ${escapeHtml(wLabels)}</div>`);
                 }
                 if (sys.claimed_by && sys.claimed_by.length > 0) {
                     const cColor = sys.is_conflict ? '#ff6b6b' : '#65d788';
                     const cTitle = sys.is_conflict ? '⚠️ Spawn Conflict Claimants' : '5-Jump Reach Claimed By';
-                    badges.push(`<div><strong style="color:${cColor};">${cTitle}:</strong> ${sys.claimed_by.join(', ')}</div>`);
+                    badges.push(`<div><strong style="color:${cColor};">${cTitle}:</strong> ${escapeHtml(sys.claimed_by.join(', '))}</div>`);
                 }
 
                 box.innerHTML = `
                     <div style="font-size:1.08em; font-weight:bold; color:#4ec9b0; margin-bottom:4px;">
-                        ${sys.name} <span style="color:#777; font-weight:normal; font-size:0.85em;">(#${sys.id})</span>
+                        ${escapeHtml(sys.name)} <span style="color:#777; font-weight:normal; font-size:0.85em;">(#${sys.id})</span>
                     </div>
                     <div style="font-size:0.8em; color:#888; margin-bottom:6px;">Coords: (${sys.x}, ${sys.y})</div>
                     ${badges.join('') || '<div style="color:#888;">Standard Star System</div>'}
@@ -1640,13 +2027,17 @@
         async function printCurrentView() {
             if (!timelineData) return;
             const activeMain = document.querySelector('.main-view.active');
+            const polDetails = document.getElementById('emp-policies-details');
+            const wasPolOpen = polDetails ? polDetails.open : false;
             if (activeMain && activeMain.id === 'view-map') {
                 const img = document.getElementById('map-print-img');
                 img.src = GalaxySpawnMap.getSnapshotDataUrl();
             } else {
+                if (polDetails) polDetails.open = true;
                 await ensureDdsHydrated(activeMain);
             }
             window.print();
+            if (polDetails) polDetails.open = wasPolOpen;
         }
 
         async function exportCurrentViewHtml() {
@@ -1676,13 +2067,13 @@
 
                     await ensureDdsHydrated(document.getElementById('view-empire'));
 
-                    // Clone Empire Profile and remove the live dropdown
                     const profileClone = document.getElementById('empire-profile-panel').cloneNode(true);
                     const sel = profileClone.querySelector('#player-select');
                     if (sel) sel.remove();
+                    const clonePol = profileClone.querySelector('#emp-policies-details');
+                    if (clonePol) clonePol.setAttribute('open', 'open');
                     profileClone.querySelectorAll('img[data-dds]').forEach(img => img.removeAttribute('data-dds'));
 
-                    // Clone active Sub-Tab
                     const subClone = activeSub.cloneNode(true);
                     subClone.querySelectorAll('img[data-dds]').forEach(img => img.removeAttribute('data-dds'));
 
@@ -1693,7 +2084,6 @@
                     pageTitle = `${campName} — ${playerLabel} — ${subLabel} (${currentDate})`;
                     outFileName = `${safeFilenamePart(campName)}_${safeFilenamePart(player.name)}_${safeFilenamePart(subLabel)}_${safeFilenamePart(currentDate)}.html`;
 
-                    // If exporting the Build Timeline, pre-cache every tooltip icon as base64 and embed interactive hover/click JS
                     if (activeSub.id === 'tab-visual-timeline') {
                         const iconPaths = new Set();
                         vtTickRegistry.forEach(info => {
@@ -1786,6 +2176,21 @@
                             ${tableClone.outerHTML}
                         </div>
                     `;
+                } else if (activeMain.id === 'view-notifications') {
+                    await ensureDdsHydrated(document.getElementById('view-notifications'));
+                    const feedClone = document.getElementById('notif-feed').cloneNode(true);
+                    feedClone.querySelectorAll('img[data-dds]').forEach(img => img.removeAttribute('data-dds'));
+                    feedClone.querySelectorAll('.notif-players').forEach(el => el.remove());
+
+                    pageTitle = `${campName} — Live Notifications (${currentDate})`;
+                    outFileName = `${safeFilenamePart(campName)}_Notifications_${safeFilenamePart(currentDate)}.html`;
+
+                    bodyHtml = `
+                        <h1><span>${escapeHtml(campName)} — Match Alerts</span><span style="font-size:0.65em; color:#4ec9b0;">Up to ${escapeHtml(currentDate)}</span></h1>
+                        <div class="notif-panel" style="height:auto; overflow:visible;">
+                            <div class="notif-feed" style="overflow:visible;">${feedClone.innerHTML}</div>
+                        </div>
+                    `;
                 } else if (activeMain.id === 'view-map') {
                     const mapPng = GalaxySpawnMap.getSnapshotDataUrl();
                     const legendHtml = document.getElementById('map-legend-block').innerHTML;
@@ -1842,7 +2247,7 @@ ${extraScript}
                     const select = document.getElementById('file-select');
                     if (files.length > 0) {
                         const prev = select.value;
-                        select.innerHTML = files.map(f => `<option value="${f}">${f}</option>`).join('');
+                        select.innerHTML = files.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
                         if (prev && files.includes(prev)) select.value = prev;
                     }
                 })
@@ -1907,6 +2312,8 @@ ${extraScript}
                 })
                 .then(data => {
                     timelineData = data;
+                    lastSeenNotifCount = (data.notifications || []).length;
+                    unreadNotifCount = 0;
                     document.title = `${data.campaign_name} - Timeline Inspector`;
                     document.getElementById('app-title').textContent = `${data.campaign_name} — Timeline Inspector`;
                     if (data.galaxy_map) {
@@ -1922,7 +2329,21 @@ ${extraScript}
             const slider = document.getElementById('timeline-slider');
             const playerSelect = document.getElementById('player-select');
             const prevSelectedPid = playerSelect.value;
-            const prevDate = globalDates[parseInt(slider.value)];
+            const prevDate = globalDates[parseInt(slider.value, 10)];
+
+            const newNotifs = newData.notifications || [];
+            const newNotifTotal = newNotifs.length;
+            const isOnNotifTab = document.getElementById('view-notifications').classList.contains('active');
+            if (newNotifTotal > lastSeenNotifCount) {
+                if (isOnNotifTab) {
+                    lastSeenNotifCount = newNotifTotal;
+                    unreadNotifCount = 0;
+                } else {
+                    const matchingNew = newNotifs.slice(lastSeenNotifCount).filter(notifMatchesCasterFilters).length;
+                    unreadNotifCount += matchingNew;
+                    lastSeenNotifCount = newNotifTotal;
+                }
+            }
 
             timelineData = newData;
             if (newData.galaxy_map && !GalaxySpawnMap.hasData()) {
@@ -1934,7 +2355,7 @@ ${extraScript}
             for (const pid in timelineData.players) {
                 const p = timelineData.players[pid];
                 p.stats_history.forEach(stat => dateSet.add(stat.date));
-                playerSelect.innerHTML += `<option value="${pid}">${p.name}</option>`;
+                playerSelect.innerHTML += `<option value="${escapeHtml(pid)}">${escapeHtml(p.name)}</option>`;
             }
             if (prevSelectedPid && timelineData.players[prevSelectedPid]) {
                 playerSelect.value = prevSelectedPid;
@@ -1958,7 +2379,12 @@ ${extraScript}
             document.querySelectorAll('.main-nav-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(viewId).classList.add('active');
             btn.classList.add('active');
-            if (viewId === 'view-map') {
+            if (viewId === 'view-notifications') {
+                unreadNotifCount = 0;
+                lastSeenNotifCount = (timelineData?.notifications || []).length;
+                renderNotifications();
+                updateNotifBadge(globalDates[parseInt(document.getElementById('timeline-slider').value, 10)] || '');
+            } else if (viewId === 'view-map') {
                 requestAnimationFrame(() => GalaxySpawnMap.resizeAndFit());
             } else {
                 updateView(true);
@@ -1966,8 +2392,11 @@ ${extraScript}
         }
 
         function jumpToPlayer(pid) {
-            document.getElementById('player-select').value = pid;
-            switchMainView('view-empire', document.getElementById('nav-empire-btn'));
+            const sel = document.getElementById('player-select');
+            if (sel && timelineData && timelineData.players[pid]) {
+                sel.value = pid;
+                switchMainView('view-empire', document.getElementById('nav-empire-btn'));
+            }
         }
 
         function switchSubTab(tabId, btn) {
@@ -2036,7 +2465,7 @@ ${extraScript}
             for (const pid in timelineData.players) {
                 const p = timelineData.players[pid];
                 p.stats_history.forEach(stat => dateSet.add(stat.date));
-                playerSelect.innerHTML += `<option value="${pid}">${p.name}</option>`;
+                playerSelect.innerHTML += `<option value="${escapeHtml(pid)}">${escapeHtml(p.name)}</option>`;
             }
             
             globalDates = Array.from(dateSet).sort();
@@ -2044,7 +2473,7 @@ ${extraScript}
             slider.value = Math.max(0, globalDates.length - 1);
 
             slider.addEventListener('input', () => {
-                const isAtLatest = parseInt(slider.value) >= globalDates.length - 1;
+                const isAtLatest = parseInt(slider.value, 10) >= globalDates.length - 1;
                 if (!isAtLatest && liveFollowEnabled) {
                     liveFollowEnabled = false;
                     document.getElementById('live-follow-pill').classList.add('paused');
@@ -2059,7 +2488,7 @@ ${extraScript}
             playerSelect.addEventListener('change', () => {
                 vtSelectedKey = null;
                 document.getElementById('vt-detail-bar').innerHTML =
-                    `<span style="color:#888;">Hover over any icon to inspect builds or techs, or click an icon to pin its details here.</span>`;
+                    `<span style="color:#888;">Hover over any icon to inspect builds, blockers, edicts, policies, diplomacy, or techs — click to pin here.</span>`;
                 updateView(false);
             });
 
@@ -2094,10 +2523,10 @@ ${extraScript}
             const resolvedIcon = iconPath || getIconPath(name);
             const tooltip = `${name}${badge ? ` [${badge}]` : ''} ×${count}`;
             const imgHtml = resolvedIcon
-                ? `<img data-dds="${resolvedIcon}" alt="${name}">`
-                : `<span class="tile-fallback">${name}</span>`;
-            const badgeHtml = badge ? `<span class="tile-size ${badge}">${badge}</span>` : '';
-            return `<div class="weapon-tile" title="${tooltip}">
+                ? `<img data-dds="${escapeHtml(resolvedIcon)}" alt="${escapeHtml(name)}">`
+                : `<span class="tile-fallback">${escapeHtml(name)}</span>`;
+            const badgeHtml = badge ? `<span class="tile-size ${escapeHtml(badge)}">${escapeHtml(badge)}</span>` : '';
+            return `<div class="weapon-tile" title="${escapeHtml(tooltip)}">
                 ${imgHtml}
                 ${badgeHtml}
                 <span class="tile-count">×${count}</span>
@@ -2106,9 +2535,9 @@ ${extraScript}
 
         function renderTemplateGroup(g) {
             if (!g.sections) {
-                const compHtml = (g.components || []).map(c => `<span class="core-chip">${c}</span>`).join('');
+                const compHtml = (g.components || []).map(c => `<span class="core-chip">${escapeHtml(c)}</span>`).join('');
                 return `<div class="ship-group">
-                    <div class="ship-group-title"><strong>${g.count}x</strong> ${g.size} <span style="color:#888;">(${g.design})</span></div>
+                    <div class="ship-group-title"><strong>${g.count}x</strong> ${escapeHtml(g.size)} <span style="color:#888;">(${escapeHtml(g.design)})</span></div>
                     <div>${compHtml}</div>
                 </div>`;
             }
@@ -2118,7 +2547,7 @@ ${extraScript}
                     ? `<div class="tile-list">${sec.weapons.map(w => renderWeaponTile(w.name, w.icon, w.size, w.count)).join('')}</div>`
                     : `<div style="color:#666; font-size:0.8em;">No weapons</div>`;
                 return `<div class="sec-card">
-                    <div class="sec-title">${sec.name}</div>
+                    <div class="sec-title">${escapeHtml(sec.name)}</div>
                     ${wHtml}
                 </div>`;
             }).join('');
@@ -2127,7 +2556,7 @@ ${extraScript}
                 if (!items || items.length === 0) return '';
                 const tiles = items.map(it => renderWeaponTile(it.name, it.icon, badge, it.count)).join('');
                 return `<div class="sec-card">
-                    <div class="sec-title">${title}</div>
+                    <div class="sec-title">${escapeHtml(title)}</div>
                     <div class="tile-list">${tiles}</div>
                 </div>`;
             };
@@ -2140,22 +2569,22 @@ ${extraScript}
                 ? `<div class="core-line">Core Systems: ${g.required.map(r => {
                     const rName = typeof r === 'string' ? r : r.name;
                     const rIcon = (typeof r === 'object' && r.icon) ? r.icon : getIconPath(rName);
-                    const iconImg = rIcon ? `<img data-dds="${rIcon}">` : '';
-                    return `<span class="core-chip">${iconImg}${rName}</span>`;
+                    const iconImg = rIcon ? `<img data-dds="${escapeHtml(rIcon)}">` : '';
+                    return `<span class="core-chip">${iconImg}${escapeHtml(rName)}</span>`;
                 }).join('')}</div>`
                 : '';
 
             return `<div class="ship-group">
-                <div class="ship-group-title"><strong>${g.count}x</strong> ${g.size} &middot; <span style="color:#9cdcfe;">${g.design}</span> <span style="color:#777; font-size:0.85em;">(components per ship)</span></div>
+                <div class="ship-group-title"><strong>${g.count}x</strong> ${escapeHtml(g.size)} &middot; <span style="color:#9cdcfe;">${escapeHtml(g.design)}</span> <span style="color:#777; font-size:0.85em;">(components per ship)</span></div>
                 <div class="template-grid">${cardsHtml}</div>
                 ${coreHtml}
             </div>`;
         }
 
-        function renderChip(label, extraClass = '', prefix = '') {
-            const icon = getIconPath(label);
-            const imgHtml = icon ? `<img data-dds="${icon}">` : '';
-            return `<span class="chip ${extraClass}">${imgHtml}${prefix}${label}</span>`;
+        function renderChip(label, extraClass = '', prefix = '', explicitIcon = '') {
+            const icon = explicitIcon || getIconPath(label);
+            const imgHtml = icon ? `<img data-dds="${escapeHtml(icon)}">` : '';
+            return `<span class="chip ${extraClass}">${imgHtml}${escapeHtml(prefix)}${escapeHtml(label)}</span>`;
         }
 
         function isEmpireAliveAt(stat) {
@@ -2164,13 +2593,114 @@ ${extraScript}
             return (stat.owned_planets || 0) > 0 || (stat.military_power || 0) > 0;
         }
 
+        function renderEmpireDiplomacy(diplo, alive) {
+            const box = document.getElementById('emp-diplomacy');
+            if (!box) return;
+            if (!alive || !diplo) {
+                box.innerHTML = `<span style="color:#777; font-size:0.86em;">No active diplomatic treaties or wars.</span>`;
+                return;
+            }
+
+            const chips = [];
+
+            (diplo.wars || []).forEach(w => {
+                const opp = (w.opponents || []).join(', ');
+                const wg = w.war_goal ? ` · ${w.war_goal}` : '';
+                chips.push(`<span class="chip war-chip" title="${escapeHtml(w.name)}${escapeHtml(wg)}">
+                    <img data-dds="/gfx/interface/icons/diplomacy/diplomacy_war.dds">
+                    War (${escapeHtml(w.role)}): vs ${escapeHtml(opp || w.name)}
+                </span>`);
+            });
+
+            if (diplo.federation) {
+                const f = diplo.federation;
+                const leadTag = f.is_leader ? ' ★' : '';
+                const membersTip = (f.members || []).length ? `Members: ${f.members.join(', ')}` : '';
+                chips.push(`<span class="chip fed-chip" title="${escapeHtml(f.type)} | ${escapeHtml(membersTip)}">
+                    <img data-dds="/gfx/interface/icons/diplomacy/diplomacy_federation.dds">
+                    Fed: ${escapeHtml(f.name)} (${escapeHtml(f.type)})${leadTag}
+                </span>`);
+            }
+
+            (diplo.defensive_pacts || []).forEach(partner => {
+                chips.push(`<span class="chip pact-chip">
+                    <img data-dds="/gfx/interface/icons/diplomacy/diplomacy_defensive_pact.dds">
+                    Def. Pact: ${escapeHtml(partner)}
+                </span>`);
+            });
+
+            (diplo.non_aggression_pacts || []).forEach(partner => {
+                chips.push(`<span class="chip pact-chip">
+                    <img data-dds="/gfx/interface/icons/diplomacy/diplomacy_nonaggression.dds">
+                    NAP: ${escapeHtml(partner)}
+                </span>`);
+            });
+
+            (diplo.research_agreements || []).forEach(partner => {
+                chips.push(`<span class="chip treaty-chip">
+                    <img data-dds="/gfx/interface/icons/diplomacy/diplomacy_research_agreement.dds">
+                    Research: ${escapeHtml(partner)}
+                </span>`);
+            });
+
+            (diplo.commercial_pacts || []).forEach(partner => {
+                chips.push(`<span class="chip treaty-chip">
+                    <img data-dds="/gfx/interface/icons/diplomacy/diplomacy_commercial_pact.dds">
+                    Commercial: ${escapeHtml(partner)}
+                </span>`);
+            });
+
+            (diplo.migration_treaties || []).forEach(partner => {
+                chips.push(`<span class="chip treaty-chip">
+                    <img data-dds="/gfx/interface/icons/diplomacy/diplomacy_migration_pact.dds">
+                    Migration: ${escapeHtml(partner)}
+                </span>`);
+            });
+
+            box.innerHTML = chips.length
+                ? chips.join('')
+                : `<span style="color:#777; font-size:0.86em;">No active wars, federation, or bilateral pacts.</span>`;
+            hydrateDdsImages(box);
+        }
+
+        function renderEmpireEdictsAndPolicies(stat, alive) {
+            const edBox = document.getElementById('emp-edicts');
+            const edCount = document.getElementById('emp-edicts-count');
+            const edicts = alive ? (stat.edicts || []) : [];
+            if (edCount) edCount.textContent = edicts.length ? `(${edicts.length})` : '';
+            if (edBox) {
+                edBox.innerHTML = edicts.length
+                    ? edicts.map(ed => renderChip(ed, 'edict-chip', '', getIconPath(ed) || '/gfx/interface/icons/menu_icon_edicts.dds')).join('')
+                    : `<span style="color:#777; font-size:0.86em;">No active edicts.</span>`;
+                hydrateDdsImages(edBox);
+            }
+
+            const polBox = document.getElementById('emp-policies');
+            const polSum = document.getElementById('emp-policies-summary');
+            const policies = alive ? (stat.policies || []) : [];
+            if (polSum) polSum.textContent = `Active Policies (${policies.length})`;
+            if (polBox) {
+                if (policies.length === 0) {
+                    polBox.innerHTML = `<span style="color:#777; font-size:0.86em;">No policy data recorded.</span>`;
+                } else {
+                    const sortedPols = policies.slice().sort((a, b) => (a.policy || '').localeCompare(b.policy || ''));
+                    polBox.innerHTML = sortedPols.map(p => `
+                        <div class="policy-card" title="${escapeHtml(p.policy)}: ${escapeHtml(p.selected)}">
+                            <span class="policy-cat">${escapeHtml(p.policy)}</span>
+                            <span class="policy-val">${escapeHtml(p.selected)}</span>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
         function renderLeaderboard() {
             if (!timelineData) return;
             const lbContainer = document.getElementById('lb-scroll-container');
             const prevScroll = lbContainer ? lbContainer.scrollTop : 0;
 
             const slider = document.getElementById('timeline-slider');
-            const currentDate = globalDates[parseInt(slider.value)];
+            const currentDate = globalDates[parseInt(slider.value, 10)];
             const query = (document.getElementById('lb-search').value || '').toLowerCase();
 
             const rows = [];
@@ -2237,22 +2767,22 @@ ${extraScript}
                 const rank = i + 1;
                 const rankClass = (r.alive && rank <= 3) ? `top-${rank}` : '';
                 const originIcon = getIconPath(r.origin);
-                const originImg = originIcon ? `<img class="game-icon" data-dds="${originIcon}"> ` : '';
+                const originImg = originIcon ? `<img class="game-icon" data-dds="${escapeHtml(originIcon)}"> ` : '';
                 const fleetPct = Math.min(100, Math.round((r.military_power / maxFleet) * 100));
                 const ecoPct = Math.min(100, Math.round((r.economy_power / maxEco) * 100));
                 const techPct = Math.min(100, Math.round((r.tech_power / maxTech) * 100));
                 const alloyColor = r.alloys_net < 0 ? '#f44336' : '#4caf50';
                 const deadBadge = !r.alive ? ` <span style="color:#f44336; font-size:0.78em;">[ELIMINATED]</span>` : '';
 
-                return `<tr class="lb-row ${r.alive ? '' : 'dead'}" onclick="jumpToPlayer('${r.pid}')" title="Click to inspect ${r.name}">
+                return `<tr class="lb-row ${r.alive ? '' : 'dead'}" onclick="jumpToPlayer('${escapeHtml(r.pid)}')" title="Click to inspect ${escapeHtml(r.name)}">
                     <td class="lb-rank ${rankClass}">#${rank}</td>
                     <td>
-                        <strong style="color:#4ec9b0;">${r.name}</strong>${deadBadge}
-                        ${r.empire_name ? `<div style="font-size:0.8em; color:#888;">${r.empire_name}</div>` : ''}
+                        <strong style="color:#4ec9b0;">${escapeHtml(r.name)}</strong>${deadBadge}
+                        ${r.empire_name ? `<div style="font-size:0.8em; color:#888;">${escapeHtml(r.empire_name)}</div>` : ''}
                     </td>
                     <td>
-                        <div style="display:flex; align-items:center; gap:6px;">${originImg}<span>${r.origin}</span></div>
-                        ${r.government ? `<div style="font-size:0.78em; color:#569cd6;">${r.government}</div>` : ''}
+                        <div style="display:flex; align-items:center; gap:6px;">${originImg}<span>${escapeHtml(r.origin)}</span></div>
+                        ${r.government ? `<div style="font-size:0.78em; color:#569cd6;">${escapeHtml(r.government)}</div>` : ''}
                     </td>
                     <td style="font-family:monospace; font-weight:bold; color:#9cdcfe;">${r.owned_planets}</td>
                     <td>
@@ -2288,15 +2818,20 @@ ${extraScript}
 
         function updateView(preserveScroll = false) {
             const slider = document.getElementById('timeline-slider');
-            const currentDate = globalDates[parseInt(slider.value)];
+            const currentDate = globalDates[parseInt(slider.value, 10)];
             const latestDate = globalDates[globalDates.length - 1];
             const dateSuffix = (!liveFollowEnabled && latestDate && currentDate !== latestDate)
                 ? ` (Latest Save: ${latestDate})`
                 : '';
             document.getElementById('date-display').textContent = `Date: ${currentDate}${dateSuffix}`;
 
+            updateNotifBadge(currentDate);
+
             if (document.getElementById('view-leaderboard').classList.contains('active')) {
                 renderLeaderboard();
+            }
+            if (document.getElementById('view-notifications').classList.contains('active')) {
+                renderNotifications();
             }
 
             const player = timelineData.players[document.getElementById('player-select').value];
@@ -2335,7 +2870,7 @@ ${extraScript}
                 civicsHtml += renderChip(c);
             });
             if (alive && currentStats.active_agenda && currentStats.active_agenda !== "None") {
-                civicsHtml += `<span class="chip agenda-chip">Agenda: ${currentStats.active_agenda} (${formatNum(currentStats.agenda_progress || 0)})</span>`;
+                civicsHtml += `<span class="chip agenda-chip">Agenda: ${escapeHtml(currentStats.active_agenda)} (${formatNum(currentStats.agenda_progress || 0)})</span>`;
             }
             const civBox = document.getElementById('emp-civics');
             civBox.innerHTML = civicsHtml;
@@ -2357,6 +2892,9 @@ ${extraScript}
             const resContainer = document.getElementById('emp-resources');
             resContainer.innerHTML = resHtml;
             hydrateDdsImages(resContainer);
+
+            renderEmpireDiplomacy(currentStats.diplomacy, alive);
+            renderEmpireEdictsAndPolicies(currentStats, alive);
 
             // Sub-Tab: Visual Build Timeline
             if (document.getElementById('tab-visual-timeline').classList.contains('active')) {
@@ -2380,7 +2918,7 @@ ${extraScript}
                     fleetFeed.innerHTML += `
                         <div class="fleet-box">
                             <div class="fleet-header" onclick="toggleFleet(this, '${safeFleetName}')">
-                                <span>${f.name} <span style="color:#888; font-weight:normal; font-size:0.9em;">(${totalShips} ships)</span></span>
+                                <span>${escapeHtml(f.name)} <span style="color:#888; font-weight:normal; font-size:0.9em;">(${totalShips} ships)</span></span>
                                 <div class="fleet-meta">
                                     <span style="color:#f44336; display:flex; align-items:center; gap:5px;">
                                         <img class="game-icon" data-dds="/gfx/interface/system/offensive_value.dds"> ${formatNum(f.power)}
@@ -2422,11 +2960,11 @@ ${extraScript}
                     const iconPath = t.icon || fallbackAreaIcon;
                     const startTag = t.starting ? `<span style="color:#777; font-size:0.8em;">(Starting)</span>` : '';
                     return `<li>
-                        <span class="date-badge">[${t.date}]</span>
-                        <span class="src-badge ${t.area}">${areaLabel}</span>
+                        <span class="date-badge">[${escapeHtml(t.date)}]</span>
+                        <span class="src-badge ${escapeHtml(t.area)}">${escapeHtml(areaLabel)}</span>
                         <span class="tier-badge">T${t.tier || 1}</span>
-                        <img class="game-icon" data-dds="${iconPath}">
-                        <span class="item-build">${t.name}</span>
+                        <img class="game-icon" data-dds="${escapeHtml(iconPath)}">
+                        <span class="item-build">${escapeHtml(t.name)}</span>
                         ${startTag}
                     </li>`;
                 }).join('');
@@ -2457,15 +2995,21 @@ ${extraScript}
                 }
             }
 
-            if ((feedFilter === 'ALL' || feedFilter === 'EMPIRE') && player.empire_events) {
+            if (feedFilter !== 'PLANET' && player.empire_events) {
                 player.empire_events.forEach(e => {
-                    if (e.date <= currentDate) {
-                        timelineEvents.push({
-                            ...e,
-                            category: 'EMPIRE',
-                            sourceLabel: 'Empire'
-                        });
-                    }
+                    if (e.date > currentDate) return;
+                    const isDiplo = DIPLO_EVENT_TYPES.has(e.type);
+                    const isEdictPol = EDICT_POLICY_EVENT_TYPES.has(e.type);
+
+                    if (feedFilter === 'DIPLO' && !isDiplo) return;
+                    if (feedFilter === 'EDICT_POLICY' && !isEdictPol) return;
+                    if (feedFilter === 'EMPIRE' && isDiplo) return;
+
+                    timelineEvents.push({
+                        ...e,
+                        category: isDiplo ? 'DIPLO' : 'EMPIRE',
+                        sourceLabel: isDiplo ? 'Diplomacy' : 'Empire'
+                    });
                 });
             }
 
@@ -2473,9 +3017,11 @@ ${extraScript}
                 .sort((a, b) => a.date.localeCompare(b.date))
                 .map(ev => {
                     const { text: actionText, cls: textClass } = formatEventLabel(ev);
-                    const badgeClass = ev.category === 'EMPIRE' ? 'src-badge empire' : 'src-badge';
+                    const badgeClass = ev.category === 'DIPLO'
+                        ? 'src-badge diplomacy'
+                        : (ev.category === 'EMPIRE' ? 'src-badge empire' : 'src-badge');
                     const iconPath = resolveEventIcon(ev);
-                    return `<li><span class="date-badge">[${ev.date}]</span> <span class="${badgeClass}">${escapeHtml(ev.sourceLabel)}</span> &rarr; <img class="game-icon" data-dds="${iconPath}"> <span class="${textClass}">${escapeHtml(actionText)}</span></li>`;
+                    return `<li><span class="date-badge">[${escapeHtml(ev.date)}]</span> <span class="${badgeClass}">${escapeHtml(ev.sourceLabel)}</span> &rarr; <img class="game-icon" data-dds="${escapeHtml(iconPath)}"> <span class="${textClass}">${escapeHtml(actionText)}</span></li>`;
                 })
                 .join('');
 
